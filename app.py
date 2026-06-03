@@ -3,13 +3,43 @@ import requests
 import pandas as pd
 from datetime import datetime
 import time
+import random
 
 st.set_page_config(page_title="Solar OS", layout="wide", page_icon="☀️")
 
-# --- LOCATION SEARCH (must be before title) ---
+# --- SIDEBAR ---
 st.sidebar.title("📍 Location")
 city = st.sidebar.text_input("Enter City", value="Jaipur")
 
+st.sidebar.divider()
+st.sidebar.title("🧪 Threat Simulator")
+auto_sim = st.sidebar.toggle("⚡ Auto Simulation", value=False)
+st.sidebar.caption("Auto generates random threat events every 5s")
+
+st.sidebar.markdown("**Manual Triggers:**")
+bird_btn = st.sidebar.button("🐦 Bird Attack", use_container_width=True)
+dust_btn = st.sidebar.button("🌫️ Dust Storm", use_container_width=True)
+
+# Determine sim event
+if bird_btn:
+    sim_event = "bird"
+elif dust_btn:
+    sim_event = "dust"
+elif auto_sim:
+    sim_time = int(time.time()) // 5
+    random.seed(sim_time)
+    sim_event = random.choice([None, None, None, "bird", "dust", "bird", "dust"])
+else:
+    sim_event = None
+
+if sim_event == "bird":
+    st.sidebar.error("🐦 Bird activity detected!")
+elif sim_event == "dust":
+    st.sidebar.error("🌫️ Dust storm detected!")
+else:
+    st.sidebar.success("✅ No simulated threats")
+
+# --- COORDINATES ---
 @st.cache_data(ttl=3600)
 def get_coordinates(city):
     url = f"https://geocoding-api.open-meteo.com/v1/search?name={city}&count=1"
@@ -45,62 +75,40 @@ radiation = hourly["shortwave_radiation"]
 hours = hourly["time"]
 
 # --- AI Decision Engine ---
-def ai_decision(wcode, wind, rain, radiation):
+def ai_decision(wcode, wind, rain, radiation, sim_event):
     solar_output = round(radiation[datetime.now().hour] * 0.22, 1)
 
     if wcode >= 95:
-        status = "🛡️ SHIELD CLOSED"
-        action = "Thunderstorm detected — panels protected"
-        mode = "protection"
-        shield = "CLOSED"
-        shield_reason = "Thunderstorm detected"
-        threat_level = "CRITICAL"
+        status = "🛡️ SHIELD CLOSED"; action = "Thunderstorm detected — panels protected"
+        mode = "protection"; shield = "CLOSED"; shield_reason = "Thunderstorm detected"; threat_level = "CRITICAL"
     elif wcode >= 61 or rain > 0.5:
-        status = "🛡️ SHIELD CLOSED"
-        action = "Heavy rain — panels protected"
-        mode = "protection"
-        shield = "CLOSED"
-        shield_reason = "Heavy rainfall detected"
-        threat_level = "HIGH"
+        status = "🛡️ SHIELD CLOSED"; action = "Heavy rain — panels protected"
+        mode = "protection"; shield = "CLOSED"; shield_reason = "Heavy rainfall detected"; threat_level = "HIGH"
     elif wind > 60:
-        status = "🛡️ SHIELD CLOSED"
-        action = "Extreme wind — panels protected"
-        mode = "protection"
-        shield = "CLOSED"
-        shield_reason = "Extreme wind speed"
-        threat_level = "HIGH"
+        status = "🛡️ SHIELD CLOSED"; action = "Extreme wind — panels protected"
+        mode = "protection"; shield = "CLOSED"; shield_reason = "Extreme wind speed"; threat_level = "HIGH"
     elif wind > 40:
-        status = "⚠️ MONITORING"
-        action = "High wind — monitoring closely"
-        mode = "monitor"
-        shield = "READY"
-        shield_reason = "Wind speed elevated — shield on standby"
-        threat_level = "MEDIUM"
+        status = "⚠️ MONITORING"; action = "High wind — monitoring closely"
+        mode = "monitor"; shield = "READY"; shield_reason = "Wind speed elevated — shield on standby"; threat_level = "MEDIUM"
+    elif sim_event == "bird":
+        status = "🛡️ SHIELD PARTIAL"; action = "Bird activity — deterrent active, partial shield"
+        mode = "monitor"; shield = "READY"; shield_reason = "Bird swarm detected by camera"; threat_level = "MEDIUM"
+    elif sim_event == "dust":
+        status = "⚠️ DUST ALERT"; action = "Dust storm — auto-clean sequence triggered"
+        mode = "monitor"; shield = "READY"; shield_reason = "Dust levels critical"; threat_level = "MEDIUM"
     elif solar_output > 150:
-        status = "⚡ FULL CONVERSION"
-        action = "Peak sunlight — maximum energy harvesting"
-        mode = "harvest"
-        shield = "OPEN"
-        shield_reason = "Clear sky — full exposure"
-        threat_level = "LOW"
+        status = "⚡ FULL CONVERSION"; action = "Peak sunlight — maximum energy harvesting"
+        mode = "harvest"; shield = "OPEN"; shield_reason = "Clear sky — full exposure"; threat_level = "LOW"
     elif solar_output > 50:
-        status = "🔋 STORING + H₂"
-        action = "Moderate sunlight — storing battery + making hydrogen"
-        mode = "store"
-        shield = "OPEN"
-        shield_reason = "Normal conditions"
-        threat_level = "LOW"
+        status = "🔋 STORING + H₂"; action = "Moderate sunlight — storing battery + making hydrogen"
+        mode = "store"; shield = "OPEN"; shield_reason = "Normal conditions"; threat_level = "LOW"
     else:
-        status = "🌙 DISTRIBUTING"
-        action = "Low/no sunlight — distributing stored energy"
-        mode = "distribute"
-        shield = "OPEN"
-        shield_reason = "No threat detected"
-        threat_level = "LOW"
+        status = "🌙 DISTRIBUTING"; action = "Low/no sunlight — distributing stored energy"
+        mode = "distribute"; shield = "OPEN"; shield_reason = "No threat detected"; threat_level = "LOW"
 
     return status, action, mode, solar_output, shield, shield_reason, threat_level
 
-status, action, mode, solar_output, shield, shield_reason, threat_level = ai_decision(wcode, wind, rain, radiation)
+status, action, mode, solar_output, shield, shield_reason, threat_level = ai_decision(wcode, wind, rain, radiation, sim_event)
 
 # --- TOP METRICS ---
 col1, col2, col3, col4 = st.columns(4)
@@ -116,7 +124,7 @@ if mode == "protection":
     st.error(f"**{status}** — {action}")
 elif mode == "harvest":
     st.success(f"**{status}** — {action}")
-elif mode == "monitor":
+elif mode in ["monitor"]:
     st.warning(f"**{status}** — {action}")
 elif mode == "store":
     st.warning(f"**{status}** — {action}")
@@ -131,44 +139,22 @@ s1, s2, s3 = st.columns(3)
 
 with s1:
     if shield == "CLOSED":
-        st.error(f"""
-        ### 🔒 SHIELD: CLOSED
-        **Reason:** {shield_reason}
-        
-        Panels are fully protected.
-        No energy harvesting active.
-        """)
+        st.error(f"### 🔒 SHIELD: CLOSED\n**Reason:** {shield_reason}\n\nPanels fully protected. No harvesting active.")
     elif shield == "READY":
-        st.warning(f"""
-        ### ⚠️ SHIELD: STANDBY
-        **Reason:** {shield_reason}
-        
-        Shield ready to deploy instantly.
-        Partial harvesting active.
-        """)
+        st.warning(f"### ⚠️ SHIELD: STANDBY\n**Reason:** {shield_reason}\n\nShield ready to deploy. Partial harvesting active.")
     else:
-        st.success(f"""
-        ### ✅ SHIELD: OPEN
-        **Reason:** {shield_reason}
-        
-        Panels fully exposed.
-        Maximum harvesting active.
-        """)
+        st.success(f"### ✅ SHIELD: OPEN\n**Reason:** {shield_reason}\n\nPanels fully exposed. Maximum harvesting active.")
 
 with s2:
     st.markdown("### 🎯 Threat Assessment")
     if threat_level == "CRITICAL":
-        st.error("🔴 CRITICAL THREAT")
-        st.progress(100)
+        st.error("🔴 CRITICAL THREAT"); st.progress(100)
     elif threat_level == "HIGH":
-        st.error("🟠 HIGH THREAT")
-        st.progress(75)
+        st.error("🟠 HIGH THREAT"); st.progress(75)
     elif threat_level == "MEDIUM":
-        st.warning("🟡 MEDIUM THREAT")
-        st.progress(50)
+        st.warning("🟡 MEDIUM THREAT"); st.progress(50)
     else:
-        st.success("🟢 LOW THREAT")
-        st.progress(15)
+        st.success("🟢 LOW THREAT"); st.progress(15)
     st.caption(f"Weather code: {wcode} | Wind: {wind} km/h | Rain: {rain}mm")
 
 with s3:
@@ -178,8 +164,8 @@ with s3:
         "🌧️ Heavy Rain": "🔴 YES" if rain > 0.5 else "🟢 NO",
         "💨 Extreme Wind": "🔴 YES" if wind > 60 else "🟢 NO",
         "⚠️ High Wind": "🟡 WATCH" if 40 < wind <= 60 else "🟢 NO",
-        "🌫️ Dust Storm": "🟢 NO",
-        "🐦 Bird Activity": "🟢 NO",
+        "🌫️ Dust Storm": "🔴 YES" if sim_event == "dust" else "🟢 NO",
+        "🐦 Bird Activity": "🔴 YES" if sim_event == "bird" else "🟢 NO",
     }
     for threat, val in threats.items():
         st.markdown(f"{threat} — **{val}**")
@@ -190,6 +176,12 @@ st.divider()
 st.subheader("☀️ Today's Solar Radiation Forecast")
 df = pd.DataFrame({"Time": hours, "Radiation (W/m²)": radiation})
 df["Estimated Output (W/m²)"] = df["Radiation (W/m²)"] * 0.22
+
+# Apply dust efficiency loss
+if sim_event == "dust":
+    df["Estimated Output (W/m²)"] = df["Estimated Output (W/m²)"] * 0.75
+    st.caption("⚠️ Dust storm active — showing 25% efficiency loss")
+
 st.line_chart(df.set_index("Time")["Estimated Output (W/m²)"])
 
 # --- HYDROGEN SIMULATION ---
@@ -250,21 +242,17 @@ st.subheader("🤖 24hr AI Decision Log")
 log_rows = []
 for i, (h, r) in enumerate(zip(hours, radiation)):
     hour_output = round(r * 0.22, 1)
+    if sim_event == "dust":
+        hour_output = round(hour_output * 0.75, 1)
     if hour_output > 150:
-        decision = "⚡ Full Conversion"
-        sh = "🟢 Open"
+        decision = "⚡ Full Conversion"; sh = "🟢 Open"
     elif hour_output > 50:
-        decision = "🔋 Store + H₂"
-        sh = "🟢 Open"
+        decision = "🔋 Store + H₂"; sh = "🟢 Open"
     else:
-        decision = "🌙 Distribute"
-        sh = "🟢 Open"
-    log_rows.append({
-        "Hour": h[11:16],
-        "Solar Output (W/m²)": hour_output,
-        "AI Decision": decision,
-        "Shield": sh
-    })
+        decision = "🌙 Distribute"; sh = "🟢 Open"
+    if sim_event == "bird":
+        sh = "⚠️ Partial"
+    log_rows.append({"Hour": h[11:16], "Solar Output (W/m²)": hour_output, "AI Decision": decision, "Shield": sh})
 
 log_df = pd.DataFrame(log_rows)
 st.dataframe(log_df, use_container_width=True, hide_index=True)
@@ -321,42 +309,28 @@ for i in range(7):
     prec = days["precipitation_sum"][i]
     wind_max = days["windspeed_10m_max"][i]
     date = days["time"][i]
-
     est_output = round(rad * 0.22, 1) if rad else 0
 
     if wc >= 95:
-        ai_plan = "🛡️ Shield closed all day"
-        recommendation = "🔴 Storm — protect panels"
+        ai_plan = "🛡️ Shield closed all day"; recommendation = "🔴 Storm — protect panels"
     elif wc >= 61 or prec > 2:
-        ai_plan = "🛡️ Shield closed — rain"
-        recommendation = "🟠 Rain — minimal harvest"
+        ai_plan = "🛡️ Shield closed — rain"; recommendation = "🟠 Rain — minimal harvest"
     elif est_output > 3000:
-        ai_plan = "⚡ Full harvest + H₂ store"
-        recommendation = "🟢 Excellent day — max production"
+        ai_plan = "⚡ Full harvest + H₂ store"; recommendation = "🟢 Excellent day — max production"
     elif est_output > 1000:
-        ai_plan = "🔋 Normal harvest + store"
-        recommendation = "🟡 Good day — normal ops"
+        ai_plan = "🔋 Normal harvest + store"; recommendation = "🟡 Good day — normal ops"
     else:
-        ai_plan = "🌙 Distribute stored energy"
-        recommendation = "⚪ Low solar — use reserves"
+        ai_plan = "🌙 Distribute stored energy"; recommendation = "⚪ Low solar — use reserves"
 
-    day_rows.append({
-        "Date": date,
-        "Est. Output (Wh/m²)": est_output,
-        "Rain (mm)": prec,
-        "Max Wind (km/h)": wind_max,
-        "AI Plan": ai_plan,
-        "Status": recommendation
-    })
+    day_rows.append({"Date": date, "Est. Output (Wh/m²)": est_output, "Rain (mm)": prec,
+                     "Max Wind (km/h)": wind_max, "AI Plan": ai_plan, "Status": recommendation})
 
 day_df = pd.DataFrame(day_rows)
 st.dataframe(day_df, use_container_width=True, hide_index=True)
 
-# AI insight
 best_day = day_df.loc[day_df["Est. Output (Wh/m²)"].idxmax(), "Date"]
 worst_day = day_df.loc[day_df["Est. Output (Wh/m²)"].idxmin(), "Date"]
 storm_days = day_df[day_df["Rain (mm)"] > 2].shape[0]
-
 st.info(f"🤖 **AI Weekly Insight:** Best production day → **{best_day}** | Storm/rain days → **{storm_days}** | Low output day → **{worst_day}** — pre-charge batteries before this date.")
 
 # --- ALERT SYSTEM ---
@@ -364,24 +338,23 @@ st.divider()
 st.subheader("🚨 Real-Time Alert System")
 
 alerts = []
-
 if wcode >= 95:
-    alerts.append(("CRITICAL", "⛈️ THUNDERSTORM DETECTED", f"Immediate shield closure triggered. All harvesting stopped. Location: {city_name}"))
+    alerts.append(("CRITICAL", "⛈️ THUNDERSTORM DETECTED", f"Immediate shield closure triggered. Location: {city_name}"))
 if wcode >= 61 or rain > 0.5:
-    alerts.append(("HIGH", "🌧️ HEAVY RAINFALL", f"Rain: {rain}mm detected. Shield closed. Panels protected."))
+    alerts.append(("HIGH", "🌧️ HEAVY RAINFALL", f"Rain: {rain}mm. Shield closed. Panels protected."))
 if wind > 60:
-    alerts.append(("HIGH", "💨 EXTREME WIND", f"Wind: {wind} km/h — exceeds safe limit. Shield closed."))
+    alerts.append(("HIGH", "💨 EXTREME WIND", f"Wind: {wind} km/h — shield closed."))
 if wind > 40:
     alerts.append(("MEDIUM", "⚠️ HIGH WIND WARNING", f"Wind: {wind} km/h — shield on standby."))
-if solar_output < 10 and datetime.now().hour > 7 and datetime.now().hour < 17:
-    alerts.append(("MEDIUM", "☁️ LOW SOLAR OUTPUT", f"Only {solar_output} W/m² during daylight hours. Possible cloud cover."))
-
-
-# 7-day storm warning
+if solar_output < 10 and 7 < datetime.now().hour < 17:
+    alerts.append(("MEDIUM", "☁️ LOW SOLAR OUTPUT", f"Only {solar_output} W/m² during daylight. Possible cloud cover."))
+if sim_event == "bird":
+    alerts.append(("HIGH", "🐦 BIRD ACTIVITY DETECTED", "Camera triggered — deterrent active. Shield partially closing."))
+if sim_event == "dust":
+    alerts.append(("HIGH", "🌫️ DUST STORM DETECTED", "Dust critical — 25% efficiency drop. Auto-clean sequence initiated."))
 for row in day_rows:
     if "Storm" in row["Status"] or "Rain" in row["Status"]:
         alerts.append(("LOW", f"📅 UPCOMING: {row['Date']}", f"{row['AI Plan']} — Pre-charge batteries recommended."))
-
 
 if not alerts:
     st.success("✅ All systems normal — No active alerts")
@@ -397,3 +370,8 @@ else:
             st.info(f"🔵 **{title}**\n\n{msg}")
 
 st.caption(f"Alert engine last checked: {datetime.now().strftime('%H:%M:%S')} | Location: {city_name}")
+
+# Auto refresh when auto sim is on
+if auto_sim:
+    time.sleep(5)
+    st.rerun()

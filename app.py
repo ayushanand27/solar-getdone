@@ -375,3 +375,117 @@ st.caption(f"Alert engine last checked: {datetime.now().strftime('%H:%M:%S')} | 
 if auto_sim:
     time.sleep(5)
     st.rerun()
+
+# --- EFFICIENCY LOSS TRACKER ---
+st.divider()
+st.subheader("📉 Efficiency Loss Tracker")
+st.caption("Real cost of NOT having Solar OS")
+
+el1, el2, el3, el4 = st.columns(4)
+dust_loss = round(solar_output * 0.28, 1)
+bird_loss = round(solar_output * 0.05, 1)
+temp_loss = round(max(0, (temp - 25) * 0.004 * solar_output), 1)
+total_loss = round(dust_loss + bird_loss + temp_loss, 1)
+protected_output = round(solar_output + total_loss, 1)
+
+el1.metric("🌫️ Dust Loss", f"{dust_loss} W/m²", "-28% typical")
+el2.metric("🐦 Bird Loss", f"{bird_loss} W/m²", "-5% typical")
+el3.metric("🌡️ Heat Loss", f"{temp_loss} W/m²", f"Temp: {temp}°C")
+el4.metric("💡 With Solar OS", f"{protected_output} W/m²", f"+{total_loss} recovered")
+
+st.info(f"🤖 Without Solar OS: **{solar_output} W/m²** | With Solar OS protection: **{protected_output} W/m²** | Recovery: **{round(total_loss/max(protected_output,1)*100,1)}%**")
+
+# --- GEOPOLITICAL IMPACT PANEL ---
+st.divider()
+st.subheader("🌍 Geopolitical Energy Independence")
+st.caption("Why this matters beyond just electricity bills")
+
+g1, g2 = st.columns(2)
+
+with g1:
+    st.markdown("""
+    ### 🛢️ Current Reality
+    - **20%** of world oil passes through Strait of Hormuz
+    - **1 conflict** → global fuel prices spike
+    - India imports **96%** of its crude oil
+    - Every ₹1 rise in oil = **₹800Cr** extra import bill
+    - Bangladesh, Philippines, Sri Lanka — economies collapse on fuel shock
+    """)
+
+with g2:
+    st.markdown("""
+    ### ☀️ Solar OS Reality
+    - Sun sends Earth energy every hour = **1 year** of humanity's need
+    - We capture **< 1%** of it
+    - Solar OS maximizes what we DO capture
+    - Every optimized farm = less oil dependency
+    - **Energy sovereignty** — your own remote control
+    """)
+
+oil_saved = round(diesel_displaced_litres / 1000, 1)
+st.success(f"🌍 This {farm_size}kW farm managed by Solar OS saves **{oil_saved} thousand litres** of oil/year — direct geopolitical independence.")
+
+# --- WHY SOLAR OS EXPLAINER ---
+st.divider()
+st.subheader("🚀 Why Solar OS Exists")
+
+w1, w2, w3 = st.columns(3)
+
+with w1:
+    st.error("""
+    ### ❌ Problem Today
+    Solar farms are **dumb**
+    
+    - Panels just sit there
+    - No unified brain
+    - Separate vendors for everything
+    - Human monitors needed 24/7
+    - Threats damage panels daily
+    - Unpredictable output → grid rejects solar
+    """)
+
+with w2:
+    st.warning("""
+    ### ⚙️ What Exists
+    Fragmented solutions
+    
+    - Cleaning robots (separate)
+    - Weather APIs (separate)  
+    - Battery management (separate)
+    - Grid software (separate)
+    - No system talks to another
+    - SpaceX model missing in solar
+    """)
+
+with w3:
+    st.success("""
+    ### ✅ Solar OS Vision
+    One AI brain for everything
+    
+    - Sense all threats in real-time
+    - Decide autonomously
+    - Protect, clean, convert, store
+    - Predict & plan 7 days ahead
+    - Tell grid exactly what's coming
+    - Minimal human intervention
+    """)
+
+# --- FOSSIL vs SOLAR COMPARISON ---
+st.divider()
+st.subheader("⚖️ Solar OS vs Fossil Fuel — Real Comparison")
+
+years = list(range(1, 26))
+fossil_cost = [farm_size * 0.12 * 8760 * y for y in years]
+solar_cost_cumulative = [farm_size * 500 + (farm_size * 0.02 * 8760 * y) for y in years]
+
+comp_df = pd.DataFrame({
+    "Year": years,
+    "Fossil Fuel Cost (₹)": fossil_cost,
+    "Solar OS Cost (₹)": solar_cost_cumulative
+})
+
+st.line_chart(comp_df.set_index("Year"))
+breakeven = next((y for y, f, s in zip(years, fossil_cost, solar_cost_cumulative) if s < f), None)
+if breakeven:
+    st.success(f"💰 Solar OS breaks even at **Year {breakeven}** — after that it's pure savings for {25-breakeven} years.")
+st.caption("Based on ₹12/kWh fossil cost vs ₹500/kW solar installation + ₹2/kWh maintenance")

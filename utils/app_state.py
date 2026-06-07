@@ -1,0 +1,208 @@
+import random
+import time
+from datetime import datetime
+
+import streamlit as st
+from PIL import Image
+
+from utils.ai_engine import ai_decision
+from utils.cv_module import SAMPLE_IMAGES, SAMPLES_DIR, run_cv_detection
+from utils.weather import get_7day, get_coordinates, get_weather
+
+
+def init_session_state():
+    defaults = {
+        "city": "Jaipur",
+        "sim_event": None,
+        "cv_threat": None,
+        "edge_mode": False,
+        "lat": 26.9124,
+        "lon": 75.7873,
+        "city_name": "Jaipur",
+        "edge_start_time": time.time(),
+        "edge_decision_log": [],
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+
+def render_sidebar():
+    st.sidebar.title("📍 Location")
+    city = st.sidebar.text_input("Enter City", value=st.session_state.city, key="city_input")
+    st.session_state.city = city
+
+    st.sidebar.divider()
+    st.sidebar.title("🧪 Threat Simulator")
+    auto_sim = st.sidebar.toggle("⚡ Auto Simulation", value=False, key="auto_sim_toggle")
+    st.sidebar.caption("Auto generates random threat events every 5s")
+    bird_btn = st.sidebar.button("🐦 Bird Attack", use_container_width=True)
+    dust_btn = st.sidebar.button("🌫️ Dust Storm", use_container_width=True)
+
+    if bird_btn:
+        sim_event = "bird"
+    elif dust_btn:
+        sim_event = "dust"
+    elif auto_sim:
+        random.seed(int(time.time()) // 5)
+        sim_event = random.choice([None, None, None, "bird", "dust", "bird", "dust"])
+    else:
+        sim_event = None
+
+    if sim_event == "bird":
+        st.sidebar.error("🐦 Bird activity detected!")
+    elif sim_event == "dust":
+        st.sidebar.error("🌫️ Dust storm detected!")
+    else:
+        st.sidebar.success("✅ No simulated threats")
+
+    st.sidebar.divider()
+    st.sidebar.title("🔬 CV Detection")
+    cv_source = st.sidebar.radio("Image Source", ["📁 Use Sample Image", "📤 Upload My Image"], key="cv_source")
+    cv_image = None
+    cv_filename = None
+
+    if cv_source == "📁 Use Sample Image":
+        sample_choice = st.sidebar.selectbox("Select Sample", SAMPLE_IMAGES, key="cv_sample_choice")
+        sample_path = SAMPLES_DIR / sample_choice
+        if sample_path.exists():
+            cv_filename = sample_choice
+            cv_image = Image.open(sample_path).convert("RGB")
+    else:
+        uploaded_file = st.sidebar.file_uploader("Upload Image", type=["png", "jpg", "jpeg"], key="cv_upload")
+        if uploaded_file is not None:
+            cv_filename = uploaded_file.name
+            cv_image = Image.open(uploaded_file).convert("RGB")
+
+    cv_threat = None
+    cv_confidence = None
+    cv_display_image = None
+    cv_verdict = "LOW"
+    cv_explanation = "Select or upload an image to run CV threat detection."
+    cv_detections = []
+
+    if cv_image is not None:
+        is_sample = cv_source == "📁 Use Sample Image"
+        cv_threat, cv_confidence, cv_display_image, cv_verdict, cv_explanation, cv_detections = run_cv_detection(
+            cv_image, cv_filename, is_sample
+        )
+        if cv_threat == "bird":
+            sim_event = "bird"
+        elif cv_threat == "dust":
+            sim_event = "dust"
+
+    st.session_state.sim_event = sim_event
+    st.session_state.cv_threat = cv_threat
+
+    st.sidebar.divider()
+    st.sidebar.title("⚡ Edge Node")
+    edge_mode = st.sidebar.toggle("🖥️ Edge Mode", value=st.session_state.edge_mode, key="edge_mode_toggle")
+    st.session_state.edge_mode = edge_mode
+
+    edge_latency = random.randint(45, 95)
+    edge_cpu = random.randint(18, 34)
+    edge_memory_used = 312
+    edge_memory_total = 4096
+
+    if edge_mode:
+        st.sidebar.success("🟢 RPi4-ARM64 ONLINE")
+        st.sidebar.metric("Inference Latency", f"{edge_latency} ms")
+        st.sidebar.metric("CPU Usage", f"{edge_cpu}%")
+        st.sidebar.caption(f"Memory: {edge_memory_used} MB / {edge_memory_total} MB")
+    else:
+        st.sidebar.info("☁️ Cloud Mode")
+
+    lat, lon, city_name = get_coordinates(city)
+    st.session_state.lat = lat
+    st.session_state.lon = lon
+    st.session_state.city_name = city_name
+    st.sidebar.success(f"📍 Showing data for: {city_name}")
+
+    return {
+        "city": city,
+        "city_name": city_name,
+        "lat": lat,
+        "lon": lon,
+        "sim_event": sim_event,
+        "auto_sim": auto_sim,
+        "cv_source": cv_source,
+        "cv_filename": cv_filename,
+        "cv_threat": cv_threat,
+        "cv_confidence": cv_confidence,
+        "cv_display_image": cv_display_image,
+        "cv_verdict": cv_verdict,
+        "cv_explanation": cv_explanation,
+        "cv_detections": cv_detections,
+        "edge_mode": edge_mode,
+        "edge_latency": edge_latency,
+        "edge_cpu": edge_cpu,
+        "edge_memory_used": edge_memory_used,
+        "edge_memory_total": edge_memory_total,
+    }
+
+
+def setup_app():
+    init_session_state()
+    sidebar = render_sidebar()
+
+    data = get_weather(sidebar["lat"], sidebar["lon"])
+    current = data["current"]
+    hourly = data["hourly"]
+
+    temp = current["temperature_2m"]
+    wind = current["windspeed_10m"]
+    rain = current["precipitation"]
+    wcode = current["weathercode"]
+    radiation = hourly["shortwave_radiation"]
+    hours = hourly["time"]
+
+    status, action, mode, solar_output, shield, shield_reason, threat_level = ai_decision(
+        wcode, wind, rain, radiation, sidebar["sim_event"]
+    )
+
+    if sidebar["edge_mode"]:
+        edge_log = st.session_state.edge_decision_log
+        entry = {
+            "time": datetime.now().strftime("%H:%M:%S"),
+            "decision": status,
+            "latency_ms": sidebar["edge_latency"],
+        }
+        if not edge_log or edge_log[-1]["decision"] != status:
+            edge_log.append(entry)
+        st.session_state.edge_decision_log = edge_log[-5:]
+
+    forecast = get_7day(sidebar["lat"], sidebar["lon"])
+
+    ctx = {
+        **sidebar,
+        "temp": temp,
+        "wind": wind,
+        "rain": rain,
+        "wcode": wcode,
+        "radiation": radiation,
+        "hours": hours,
+        "status": status,
+        "action": action,
+        "mode": mode,
+        "solar_output": solar_output,
+        "shield": shield,
+        "shield_reason": shield_reason,
+        "threat_level": threat_level,
+        "forecast": forecast,
+    }
+
+    if sidebar["auto_sim"]:
+        time.sleep(5)
+        st.rerun()
+
+    return ctx
+
+
+def render_edge_banner(ctx):
+    if ctx["edge_mode"]:
+        st.success(
+            f"⚡ **EDGE MODE ACTIVE** — Decisions running locally on RPi4-ARM64 "
+            f"| Latency: {ctx['edge_latency']}ms | No cloud dependency"
+        )
+    else:
+        st.info("☁️ **CLOUD MODE** — Decisions synced via AWS IoT Greengrass")

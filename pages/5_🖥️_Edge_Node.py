@@ -6,9 +6,19 @@ import time
 import pandas as pd
 
 from utils.app_state import render_edge_banner, setup_app
+from utils.mobile_alerts import (
+    SNS_TOPIC_ARN,
+    init_alert_state,
+    latest_phone_message,
+    process_auto_alerts,
+    render_alert_config,
+    send_test_alert,
+    sns_estimated_cost,
+)
 from utils.mqtt_sim import publish_mqtt_messages
 
 ctx = setup_app()
+init_alert_state()
 
 st.title("🖥️ Edge Node")
 st.caption(f"Local inference monitor — RPi4-ARM64 | 📍 {ctx['city_name']}")
@@ -52,11 +62,25 @@ broker_label = publish_mqtt_messages(ctx)
 st.caption(f"Broker: **{broker_label}** — publishes 4 topics on every refresh")
 
 aws_col1, aws_col2 = st.columns([2, 1])
+mqtt_status = st.session_state.get(
+    "mqtt_status",
+    {"success": False, "message": "Visit Home page to publish", "host": ""},
+)
+mqtt_host = mqtt_status.get("host", "")
+if not mqtt_host:
+    try:
+        mqtt_host = st.secrets["mqtt"]["host"]
+    except (KeyError, FileNotFoundError, AttributeError):
+        mqtt_host = "—"
+
 with aws_col1:
-    st.success("✅ Synced to AWS IoT Greengrass")
+    if mqtt_status.get("success"):
+        st.success(f"📡 HiveMQ Cloud: ✅ Live — `{mqtt_host}`")
+    else:
+        st.error(f"📡 HiveMQ Cloud: ❌ {mqtt_status.get('message', 'Not connected')}")
 with aws_col2:
     last_sync = st.session_state.get("mqtt_last_sync", "—")
-    st.metric("Last AWS Sync", last_sync)
+    st.metric("Last MQTT Sync", last_sync)
 
 st.markdown("#### Live MQTT Message Feed")
 feed = list(reversed(st.session_state.get("mqtt_feed", [])))
@@ -64,3 +88,65 @@ if feed:
     st.dataframe(pd.DataFrame(feed), use_container_width=True, hide_index=True)
 else:
     st.info("MQTT messages will appear here after the first refresh.")
+
+st.divider()
+st.subheader("📱 Mobile Alert System (AWS SNS Mock)")
+
+if "alert_email" not in st.session_state:
+    try:
+        st.session_state.alert_email = st.secrets["email"]["recipient"]
+    except (KeyError, FileNotFoundError, AttributeError):
+        st.session_state.alert_email = ""
+
+email_col1, email_col2 = st.columns([2, 1])
+with email_col1:
+    st.session_state.alert_email = st.text_input(
+        "📧 Alert Email",
+        value=st.session_state.alert_email,
+        key="alert_email_input",
+    )
+with email_col2:
+    st.checkbox("☑ Send email alerts (SMTP)", key="alert_email_enabled")
+
+alert_config = render_alert_config()
+process_auto_alerts(ctx, alert_config)
+
+if st.button("🔔 Test Alert", use_container_width=False):
+    send_test_alert(ctx["city_name"])
+
+if st.session_state.get("last_email_status"):
+    status_msg = st.session_state.last_email_status
+    if status_msg.startswith("✅"):
+        st.success(status_msg)
+    else:
+        st.error(status_msg)
+
+phone_msg = latest_phone_message(ctx)
+st.markdown(
+    f"""
+<div style="max-width:320px;margin:16px auto;padding:12px;background:#111;border-radius:24px;
+border:3px solid #333;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+  <div style="background:#1a1a2e;border-radius:16px;padding:16px;color:#fff;font-family:sans-serif;">
+    <div style="font-size:11px;color:#888;margin-bottom:8px;">Solar OS Alert 🌞 · now</div>
+    <div style="font-size:14px;line-height:1.5;">
+      ⚠️ {phone_msg}
+    </div>
+  </div>
+</div>
+""",
+    unsafe_allow_html=True,
+)
+
+st.markdown("#### Alert Log")
+alert_log = list(reversed(st.session_state.get("alert_log", [])))
+if alert_log:
+    st.dataframe(pd.DataFrame(alert_log), use_container_width=True, hide_index=True)
+else:
+    st.caption("No alerts sent yet. Enable alert types above or click **🔔 Test Alert**.")
+
+sns_count = st.session_state.get("sns_messages_today", 0)
+sns_cost = sns_estimated_cost(sns_count)
+s1, s2, s3 = st.columns(3)
+s1.markdown(f"**📡 SNS Topic:** `{SNS_TOPIC_ARN}`")
+s2.metric("Messages Published Today", sns_count)
+s3.metric("Estimated SNS Cost", f"${sns_cost:.7f}")

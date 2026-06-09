@@ -6,6 +6,7 @@ import time
 import pandas as pd
 
 from utils.app_state import render_edge_banner, setup_app
+from utils.mqtt_client import publish_to_hivemq
 from utils.mobile_alerts import (
     SNS_TOPIC_ARN,
     init_alert_state,
@@ -19,6 +20,25 @@ from utils.mqtt_sim import publish_mqtt_messages
 
 ctx = setup_app()
 init_alert_state()
+
+if "mqtt_status" not in st.session_state or not st.session_state.get("mqtt_status", {}).get("success"):
+    success, msg = publish_to_hivemq(
+        ctx.get("solar_output", 0),
+        ctx.get("temp", 30),
+        ctx.get("wind", 10),
+        ctx.get("shield", "OPEN"),
+        ctx.get("mode", "distribute"),
+        ctx.get("threat_level", "LOW"),
+    )
+    try:
+        mqtt_host = st.secrets["mqtt"]["host"]
+    except (KeyError, FileNotFoundError, AttributeError):
+        mqtt_host = ""
+    st.session_state.mqtt_status = {
+        "success": success,
+        "message": msg,
+        "host": mqtt_host,
+    }
 
 st.title("🖥️ Edge Node")
 st.caption(f"Local inference monitor — RPi4-ARM64 | 📍 {ctx['city_name']}")

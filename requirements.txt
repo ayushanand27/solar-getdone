@@ -6,3 +6,4 @@ opencv-python-headless
 Pillow
 paho-mqtt
 plotly
+reportlab

@@ -1,24 +1,55 @@
 import streamlit as st
 st.set_page_config(page_title="Solar OS", layout="wide", page_icon="☀️")
 
+from datetime import datetime
+
 import pandas as pd
 
 from utils.app_state import setup_app
+from utils.pdf_report import (
+    build_forecast_rows,
+    build_recommendations,
+    compute_analytics_metrics,
+    generate_farm_report,
+)
 
 ctx = setup_app()
 
 st.title("💰 Analytics")
 st.caption(f"Savings, efficiency, and long-term ROI | 📍 {ctx['city_name']}")
 
+farm_size_report = st.session_state.get("analytics_farm_size", 500)
+electricity_rate_report = st.session_state.get("analytics_electricity_rate", 7)
+diesel_rate_report = st.session_state.get("analytics_diesel_rate", 95)
+metrics_report = compute_analytics_metrics(
+    ctx, farm_size_report, electricity_rate_report, diesel_rate_report
+)
+forecast_rows = build_forecast_rows(ctx)
+recommendations = build_recommendations(ctx, metrics_report)
+report_date = datetime.now().strftime("%Y-%m-%d")
+report_time = datetime.now().strftime("%H:%M:%S")
+city_slug = ctx["city_name"].replace(" ", "_")
+pdf_bytes = generate_farm_report(
+    ctx, metrics_report, forecast_rows, recommendations, report_date, report_time
+)
+
+st.download_button(
+    label="📄 Download Farm Report",
+    data=pdf_bytes,
+    file_name=f"SolarOS_Report_{city_slug}_{report_date}.pdf",
+    mime="application/pdf",
+)
+
+st.divider()
 st.subheader("💰 Energy Savings Calculator")
 st.caption("If Solar OS was managing a real farm here — what would be saved?")
 ec1, ec2, ec3 = st.columns(3)
 with ec1:
-    farm_size = st.slider("Farm Size (kW)", 10, 10000, 500, 10)
+    farm_size = st.slider("Farm Size (kW)", 10, 10000, 500, 10, key="analytics_farm_size")
 with ec2:
-    electricity_rate = st.slider("Electricity Rate (₹/kWh)", 3, 12, 7)
+    electricity_rate = st.slider("Electricity Rate (₹/kWh)", 3, 12, 7, key="analytics_electricity_rate")
 with ec3:
-    diesel_rate = st.slider("Diesel Price (₹/L)", 80, 120, 95)
+    diesel_rate = st.slider("Diesel Price (₹/L)", 80, 120, 95, key="analytics_diesel_rate")
 
 daily_hours = sum(1 for r in ctx["radiation"] if r * 0.22 > 50)
 daily_energy_kwh = round(farm_size * daily_hours * 0.22, 1)

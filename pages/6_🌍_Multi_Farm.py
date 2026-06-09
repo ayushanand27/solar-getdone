@@ -13,6 +13,7 @@ import plotly.express as px
 
 from utils.ai_engine import ai_decision
 from utils.app_state import setup_app
+from utils.health_score import calculate_health_score
 from utils.weather import get_coordinates, get_weather
 
 FARMS = [
@@ -34,10 +35,10 @@ FARMS_MAP = [
 ]
 
 THREAT_MAP_COLORS = {
-    "CRITICAL": "red",
-    "HIGH": "red",
-    "MEDIUM": "yellow",
-    "LOW": "green",
+    "LOW": "#00C896",
+    "MEDIUM": "#F7B731",
+    "HIGH": "#EF4444",
+    "CRITICAL": "#7C3AED",
 }
 
 
@@ -46,25 +47,29 @@ def build_farms_map_df(all_farms):
     rows = []
     for farm in FARMS_MAP:
         data = farm_lookup.get(farm["name"], {})
+        threat_level = data.get("threat_level", "LOW")
         rows.append(
             {
                 **farm,
                 "solar_output": data.get("solar_output", 0),
                 "shield": data.get("shield_display", data.get("shield", "—")),
-                "threat_level": data.get("threat_level", "LOW"),
+                "threat_level": threat_level,
+                "threat_color": THREAT_MAP_COLORS.get(threat_level, "#00C896"),
+                "health_score": data.get("health_score", 50),
+                "health_grade": data.get("health_grade", "🟡 Good"),
             }
         )
     return pd.DataFrame(rows)
 
 
-def render_fleet_map(all_farms):
+def render_fleet_map(all_farms, map_style):
     map_df = build_farms_map_df(all_farms)
-    fig = px.scatter_mapbox(
+    fig = px.scatter_map(
         map_df,
         lat="lat",
         lon="lon",
         color="threat_level",
-        size="solar_output",
+        size="health_score",
         size_max=35,
         hover_name="name",
         hover_data={
@@ -74,12 +79,14 @@ def render_fleet_map(all_farms):
             "solar_output": True,
             "shield": True,
             "threat_level": True,
+            "health_score": True,
+            "health_grade": True,
+            "threat_color": False,
         },
         color_discrete_map=THREAT_MAP_COLORS,
         zoom=4.2,
         center={"lat": 20.5, "lon": 78.0},
-        mapbox_style="carto-darkmatter",
-        title="☀️ Solar Farm Fleet — India",
+        map_style=map_style,
     )
     fig.update_layout(margin={"r": 0, "t": 40, "l": 0, "b": 0}, height=480)
     st.plotly_chart(fig, use_container_width=True)
@@ -108,6 +115,20 @@ def load_farm(farm, sim_event):
         sim_event,
     )
 
+    h2_kg = estimate_h2_kg(radiation)
+    battery_level = min(100, int(solar_output / 2))
+    h2_level = min(100, int(h2_kg * 40))
+    health_score, health_grade = calculate_health_score(
+        solar_output,
+        threat_level,
+        battery_level,
+        h2_level,
+        shield,
+        current["windspeed_10m"],
+        current["precipitation"],
+        current["weathercode"],
+    )
+
     return {
         **farm,
         "city_name": city_name,
@@ -127,7 +148,11 @@ def load_farm(farm, sim_event):
         "shield_display": shield_display(shield),
         "shield_reason": shield_reason,
         "threat_level": threat_level,
-        "h2_kg": estimate_h2_kg(radiation),
+        "h2_kg": h2_kg,
+        "battery_level": battery_level,
+        "h2_level": h2_level,
+        "health_score": health_score,
+        "health_grade": health_grade,
     }
 
 
@@ -178,7 +203,19 @@ st.caption(f"Fleet-wide solar intelligence across 5 Indian farms | Sidebar locat
 with ThreadPoolExecutor(max_workers=5) as pool:
     all_farms = list(pool.map(lambda f: load_farm(f, ctx["sim_event"]), FARMS))
 
-render_fleet_map(all_farms)
+col1, col2 = st.columns([3, 1])
+with col1:
+    st.markdown("### ☀️ Solar Farm Fleet — India")
+with col2:
+    map_style_toggle = st.radio(
+        "Map Style",
+        ["🌑 Dark", "🌍 Terrain"],
+        horizontal=True,
+        index=0,
+    )
+
+map_style = "carto-darkmatter" if map_style_toggle == "🌑 Dark" else "open-street-map"
+render_fleet_map(all_farms, map_style)
 st.divider()
 
 total_output = round(sum(f["solar_output"] for f in all_farms), 1)
@@ -233,6 +270,7 @@ for col, farm in zip(cols, all_farms):
         st.markdown(f"### {farm['name']}")
         st.caption(f"📍 {farm['region']}")
         st.metric("Solar Output", f"{farm['solar_output']} W/m²")
+        st.markdown(f"**Health:** {farm['health_score']}/100 {farm['health_grade']}")
         st.markdown(f"**Shield:** {farm['shield_display']}")
         st.markdown(f"**Energy Mode:** {farm['status']}")
         render_threat(farm["threat_level"])
@@ -247,11 +285,12 @@ farm_data = [f for f in all_farms if f["name"] == selected][0]
 
 st.subheader(f"🔍 Farm Detail — {farm_data['name']}")
 
-d1, d2, d3, d4 = st.columns(4)
+d1, d2, d3, d4, d5 = st.columns(5)
 d1.metric("Solar Output", f"{farm_data['solar_output']} W/m²")
 d2.metric("Temperature", f"{farm_data['temp']}°C")
 d3.metric("Wind", f"{farm_data['wind']} km/h")
 d4.metric("H₂ Today", f"{farm_data['h2_kg']} kg")
+d5.metric("Health Score", f"{farm_data['health_score']}/100", farm_data["health_grade"])
 
 if farm_data["mode"] == "protection":
     st.error(f"**{farm_data['status']}** — {farm_data['action']}")

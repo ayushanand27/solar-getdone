@@ -7,6 +7,20 @@ import paho.mqtt.client as mqtt
 import streamlit as st
 
 
+def publish_if_due(solar_output, temp, wind, shield, mode, threat):
+    if "last_mqtt_publish" not in st.session_state:
+        st.session_state.last_mqtt_publish = 0
+
+    current_time = time.time()
+    if current_time - st.session_state.last_mqtt_publish > 60:
+        success, msg = publish_to_hivemq(solar_output, temp, wind, shield, mode, threat)
+        st.session_state.last_mqtt_publish = current_time
+        st.session_state.last_mqtt_result = (success, msg)
+        return success, msg
+
+    return st.session_state.get("last_mqtt_result", (False, "Waiting for next publish window"))
+
+
 def publish_to_hivemq(solar_output, temp, wind, shield, mode, threat):
     try:
         host = st.secrets["mqtt"]["host"]

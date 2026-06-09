@@ -100,6 +100,12 @@ def estimate_h2_kg(radiation):
     return round(sum(r * 0.22 * 0.7 for r in radiation if r > 100) / 1000, 2)
 
 
+@st.cache_data(ttl=300)
+def fetch_all_farms(sim_event):
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        return list(pool.map(lambda f: load_farm(f, sim_event), FARMS))
+
+
 def load_farm(farm, sim_event):
     lat, lon, city_name = get_coordinates(farm["city"])
     data = get_weather(lat, lon)
@@ -200,8 +206,7 @@ ctx = setup_app()
 st.title("🌍 Multi-Farm Dashboard")
 st.caption(f"Fleet-wide solar intelligence across 5 Indian farms | Sidebar location: {ctx['city_name']}")
 
-with ThreadPoolExecutor(max_workers=5) as pool:
-    all_farms = list(pool.map(lambda f: load_farm(f, ctx["sim_event"]), FARMS))
+all_farms = fetch_all_farms(ctx["sim_event"])
 
 col1, col2 = st.columns([3, 1])
 with col1:

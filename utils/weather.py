@@ -2,7 +2,7 @@ import requests
 import streamlit as st
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=300)
 def get_coordinates(city):
     url = f"https://geocoding-api.open-meteo.com/v1/search?name={city}&count=1"
     r = requests.get(url)

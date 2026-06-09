@@ -62,13 +62,16 @@ def _pick_channel():
     return random.choice(CHANNELS)
 
 
-def _auto_once(key, alert_type, message, enabled):
-    if not enabled:
-        return
-    if st.session_state.last_auto_alert_key == key:
-        return
-    if append_alert(alert_type, message):
-        st.session_state.last_auto_alert_key = key
+def _auto_once(key, alert_type, message, enabled=True):
+    try:
+        if not enabled:
+            return
+        if st.session_state.last_auto_alert_key == key:
+            return
+        if append_alert(alert_type, message):
+            st.session_state.last_auto_alert_key = key
+    except Exception:
+        pass
 
 
 def battery_level(solar_output):
@@ -101,57 +104,73 @@ def render_alert_config():
 
 
 def process_auto_alerts(ctx, config):
-    init_alert_state()
-    city = ctx["city_name"]
-    sim = ctx["sim_event"]
+    try:
+        if ctx is None:
+            return
+        if not isinstance(ctx, dict):
+            return
+        if config is None:
+            return
 
-    if sim != st.session_state.get("last_sim_event"):
-        st.session_state.last_auto_alert_key = None
-        st.session_state.last_sim_event = sim
+        init_alert_state()
+        city = ctx.get("city_name", "Farm")
+        sim = ctx.get("sim_event")
 
-    if sim == "bird" and config["bird_dust"]:
-        _auto_once(
-            "bird",
-            "CV Detection",
-            f"Bird activity detected at {city}. Shield partially closed. Check dashboard.",
-        )
-    elif sim == "dust" and config["bird_dust"]:
-        _auto_once(
-            "dust",
-            "CV Detection",
-            f"Dust storm detected at {city}. Auto-clean initiated. 25% efficiency loss.",
-        )
+        if sim != st.session_state.get("last_sim_event"):
+            st.session_state.last_auto_alert_key = None
+            st.session_state.last_sim_event = sim
 
-    if ctx["wcode"] >= 95 and config["storm"]:
-        _auto_once(
-            "storm",
-            "Storm",
-            f"Thunderstorm alert at {city}. Shield closed — panels protected.",
-        )
+        if sim == "bird" and config.get("bird_dust"):
+            _auto_once(
+                "bird",
+                "CV Detection",
+                f"Bird activity detected at {city}. Shield partially closed. Check dashboard.",
+                config["bird_dust"],
+            )
+        elif sim == "dust" and config.get("bird_dust"):
+            _auto_once(
+                "dust",
+                "CV Detection",
+                f"Dust storm detected at {city}. Auto-clean initiated. 25% efficiency loss.",
+                config["bird_dust"],
+            )
 
-    batt = battery_level(ctx["solar_output"])
-    if batt < 20 and config["battery"]:
-        _auto_once(
-            f"battery_{batt}",
-            "Battery",
-            f"Battery critical ({batt}%) at {city}. Prioritizing charge from grid/solar.",
-        )
+        if ctx.get("wcode", 0) >= 95 and config.get("storm"):
+            _auto_once(
+                "storm",
+                "Storm",
+                f"Thunderstorm alert at {city}. Shield closed — panels protected.",
+                config["storm"],
+            )
 
-    h2 = h2_tank_level(ctx["radiation"])
-    if h2 > 80 and config["h2_full"]:
-        _auto_once(
-            f"h2_{h2}",
-            "H₂ Tank",
-            f"H₂ tank nearly full ({h2}%) at {city}. Redirect surplus to grid export.",
-        )
+        batt = battery_level(ctx.get("solar_output", 0))
+        if batt < 20 and config.get("battery"):
+            _auto_once(
+                f"battery_{batt}",
+                "Battery",
+                f"Battery critical ({batt}%) at {city}. Prioritizing charge from grid/solar.",
+                config["battery"],
+            )
 
-    hour = datetime.now().hour
-    if hour in PEAK_HOURS and config["peak"]:
-        _auto_once(
-            f"peak_{hour}",
-            "Grid Export",
-            f"Peak pricing window active (₹12/kWh) at {city}. Export surplus now.",
-        )
+        h2 = h2_tank_level(ctx.get("radiation", []))
+        if h2 > 80 and config.get("h2_full"):
+            _auto_once(
+                f"h2_{h2}",
+                "H₂ Tank",
+                f"H₂ tank nearly full ({h2}%) at {city}. Redirect surplus to grid export.",
+                config["h2_full"],
+            )
+
+        hour = datetime.now().hour
+        if hour in PEAK_HOURS and config.get("peak"):
+            _auto_once(
+                f"peak_{hour}",
+                "Grid Export",
+                f"Peak pricing window active (₹12/kWh) at {city}. Export surplus now.",
+                config["peak"],
+            )
+    except Exception:
+        pass
 
 
 def send_test_alert(city_name):

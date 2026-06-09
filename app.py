@@ -3,11 +3,11 @@ st.set_page_config(page_title="Solar OS", layout="wide", page_icon="☀️")
 
 from utils.app_state import render_edge_banner, setup_app
 from utils.health_score import calculate_health_score
-from utils.mqtt_client import publish_to_hivemq
+from utils.mqtt_client import publish_if_due
 
 ctx = setup_app()
 
-success, msg = publish_to_hivemq(
+success, msg = publish_if_due(
     ctx["solar_output"],
     ctx["temp"],
     ctx["wind"],

@@ -20,7 +20,7 @@ SAMPLES_DIR = Path("samples") if Path("samples").exists() else Path("sample")
 
 
 @st.cache_resource
-def load_yolo_model():
+def load_model():
     from ultralytics import YOLO
 
     return YOLO("yolov8n.pt")
@@ -71,7 +71,7 @@ def run_cv_detection(image, filename, is_sample):
         display_image = add_threat_border(image, threat)
         return threat, confidence, display_image, *get_cv_verdict(threat), []
 
-    model = load_yolo_model()
+    model = load_model()
     results = model(np.array(image), verbose=False)[0]
     detections = []
     if results.boxes is not None:

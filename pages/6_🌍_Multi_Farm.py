@@ -183,6 +183,54 @@ def render_threat(level):
         st.success(threat_badge(level))
 
 
+def render_farm_skeleton_cards():
+    st.subheader("🏭 Farm Overview")
+    cols = st.columns(len(FARMS))
+    for col, farm in zip(cols, FARMS):
+        with col:
+            st.markdown(
+                f"""
+<div style="background:#161B22;border:1px solid #30363D;border-radius:10px;
+padding:16px;min-height:280px;">
+<div style="color:#8B949E;font-size:13px;margin-bottom:8px;">⏳ Loading…</div>
+<div style="color:#E6EDF3;font-size:16px;font-weight:600;margin-bottom:12px;">{farm['name']}</div>
+<div style="background:#21262D;height:10px;border-radius:4px;margin:10px 0;"></div>
+<div style="background:#21262D;height:10px;border-radius:4px;width:75%;margin:10px 0;"></div>
+<div style="background:#21262D;height:10px;border-radius:4px;width:55%;margin:10px 0;"></div>
+<div style="background:#21262D;height:32px;border-radius:6px;margin-top:20px;"></div>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+
+
+def render_farm_overview(all_farms):
+    st.subheader("🏭 Farm Overview")
+    cols = st.columns(len(all_farms))
+    for col, farm in zip(cols, all_farms):
+        border_color = (
+            "2px solid #00C896"
+            if farm["name"] == st.session_state.selected_farm
+            else "1px solid #30363D"
+        )
+        with col:
+            st.markdown(
+                f'<div style="border:{border_color}; border-radius:10px; padding:16px; min-height:280px;">',
+                unsafe_allow_html=True,
+            )
+            st.markdown(f"### {farm['name']}")
+            st.caption(f"📍 {farm['region']}")
+            st.metric("Solar Output", f"{farm['solar_output']} W/m²")
+            st.markdown(f"**Health:** {farm['health_score']}/100 {farm['health_grade']}")
+            st.markdown(f"**Shield:** {farm['shield_display']}")
+            st.markdown(f"**Energy Mode:** {farm['status']}")
+            render_threat(farm["threat_level"])
+            st.caption(f"🌡️ {farm['temp']}°C | 💨 {farm['wind']} km/h")
+            if st.button("View Details", key=f"btn_{farm['name']}", use_container_width=True):
+                st.session_state.selected_farm = farm["name"]
+            st.markdown("</div>", unsafe_allow_html=True)
+
+
 def build_decision_log(hours, radiation, sim_event):
     log_rows = []
     for h, r in zip(hours, radiation):
@@ -206,7 +254,15 @@ ctx = setup_app()
 st.title("🌍 Multi-Farm Dashboard")
 st.caption(f"Fleet-wide solar intelligence across 5 Indian farms | Sidebar location: {ctx['city_name']}")
 
-all_farms = fetch_all_farms(ctx["sim_event"])
+loading_slot = st.empty()
+with loading_slot.container():
+    st.info("🌍 Loading fleet data from 5 Indian farms…")
+    render_farm_skeleton_cards()
+
+with st.spinner("🌍 Fetching farm data..."):
+    all_farms = fetch_all_farms(ctx["sim_event"])
+
+loading_slot.empty()
 
 col1, col2 = st.columns([3, 1])
 with col1:
@@ -258,31 +314,7 @@ chart = (
 st.altair_chart(chart, use_container_width=True)
 
 st.divider()
-st.subheader("🏭 Farm Overview")
-
-cols = st.columns(len(all_farms))
-for col, farm in zip(cols, all_farms):
-    border_color = (
-        "2px solid #00C896"
-        if farm["name"] == st.session_state.selected_farm
-        else "1px solid #30363D"
-    )
-    with col:
-        st.markdown(
-            f'<div style="border:{border_color}; border-radius:10px; padding:16px; min-height:280px;">',
-            unsafe_allow_html=True,
-        )
-        st.markdown(f"### {farm['name']}")
-        st.caption(f"📍 {farm['region']}")
-        st.metric("Solar Output", f"{farm['solar_output']} W/m²")
-        st.markdown(f"**Health:** {farm['health_score']}/100 {farm['health_grade']}")
-        st.markdown(f"**Shield:** {farm['shield_display']}")
-        st.markdown(f"**Energy Mode:** {farm['status']}")
-        render_threat(farm["threat_level"])
-        st.caption(f"🌡️ {farm['temp']}°C | 💨 {farm['wind']} km/h")
-        if st.button("View Details", key=f"btn_{farm['name']}", use_container_width=True):
-            st.session_state.selected_farm = farm["name"]
-        st.markdown("</div>", unsafe_allow_html=True)
+render_farm_overview(all_farms)
 
 st.divider()
 selected = st.session_state.selected_farm

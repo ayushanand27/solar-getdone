@@ -2,7 +2,7 @@ import requests
 import streamlit as st
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=600)
 def get_coordinates(city):
     url = f"https://geocoding-api.open-meteo.com/v1/search?name={city}&count=1"
     r = requests.get(url)
@@ -13,7 +13,7 @@ def get_coordinates(city):
     return 26.9124, 75.7873, "Jaipur"
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=600)
 def get_weather(lat, lon):
     url = (
         f"https://api.open-meteo.com/v1/forecast"
@@ -45,7 +45,7 @@ def get_weather(lat, lon):
         }
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=600)
 def get_7day(lat, lon):
     url = (
         f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"

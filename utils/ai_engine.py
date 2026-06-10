@@ -94,3 +94,25 @@ def ai_decision(wcode, wind, rain, radiation, sim_event):
         "No threat detected",
         "LOW",
     )
+
+
+def detect_anomaly(radiation_history: list) -> dict:
+    if len(radiation_history) < 2:
+        return {"anomaly": False}
+
+    current = radiation_history[-1]
+    previous = radiation_history[-2]
+
+    if previous == 0:
+        return {"anomaly": False}
+
+    drop_pct = ((previous - current) / previous) * 100
+
+    if drop_pct > 30:
+        return {
+            "anomaly": True,
+            "type": "sudden_drop",
+            "drop_pct": round(drop_pct, 1),
+            "message": f"Solar output dropped {round(drop_pct, 1)}% in 1 hour — possible cloud cover, dust, or panel damage",
+        }
+    return {"anomaly": False}

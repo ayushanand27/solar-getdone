@@ -8,13 +8,13 @@ import streamlit as st
 
 
 def publish_if_due(solar_output, temp, wind, shield, mode, threat):
-    if "last_mqtt_publish" not in st.session_state:
-        st.session_state.last_mqtt_publish = 0
+    if "last_mqtt" not in st.session_state:
+        st.session_state.last_mqtt = 0
 
     current_time = time.time()
-    if current_time - st.session_state.last_mqtt_publish > 60:
+    if current_time - st.session_state.last_mqtt > 60:
         success, msg = publish_to_hivemq(solar_output, temp, wind, shield, mode, threat)
-        st.session_state.last_mqtt_publish = current_time
+        st.session_state.last_mqtt = current_time
         st.session_state.last_mqtt_result = (success, msg)
         return success, msg
 

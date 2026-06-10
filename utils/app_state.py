@@ -6,6 +6,7 @@ import streamlit as st
 from PIL import Image
 
 from utils.ai_engine import ai_decision
+from utils.auth import check_auth
 from utils.cv_module import SAMPLE_IMAGES, SAMPLES_DIR, run_cv_detection
 from utils.weather import get_7day, get_coordinates, get_weather
 
@@ -142,6 +143,7 @@ def render_sidebar():
 
 
 def setup_app():
+    check_auth()
     init_session_state()
     sidebar = render_sidebar()
 

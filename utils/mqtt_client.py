@@ -1,7 +1,21 @@
+import json
+import ssl
 import threading
 import time
+from datetime import datetime
 
+import paho.mqtt.client as mqtt
 import streamlit as st
+
+
+def _create_mqtt_client(client_id):
+    kwargs = {
+        "client_id": client_id,
+        "protocol": mqtt.MQTTv311,
+    }
+    if hasattr(mqtt, "CallbackAPIVersion"):
+        kwargs["callback_api_version"] = mqtt.CallbackAPIVersion.VERSION1
+    return mqtt.Client(**kwargs)
 
 
 def publish_if_due(solar_output, temp, wind, shield, mode, threat):
@@ -19,46 +33,83 @@ def publish_if_due(solar_output, temp, wind, shield, mode, threat):
 
 
 def publish_to_hivemq(solar_output, temp, wind, shield, mode, threat):
-    import json
-    import ssl
-    from datetime import datetime
-
-    import paho.mqtt.client as mqtt
-
-    result = {"success": False, "msg": "Timeout"}
+    result = {"success": False, "msg": "Not started"}
+    published_count = [0]
 
     messages = {
-        "solar/weather": {"temp": temp, "wind": wind, "ts": datetime.now().isoformat()},
-        "solar/shield": {"status": shield, "ts": datetime.now().isoformat()},
-        "solar/energy_mode": {"mode": mode, "solar": solar_output, "ts": datetime.now().isoformat()},
-        "solar/alerts": {"level": threat, "ts": datetime.now().isoformat()},
+        "solar/weather": {
+            "temp": temp,
+            "wind": wind,
+            "location": st.session_state.get("city_name", "Unknown"),
+            "ts": datetime.now().isoformat(),
+        },
+        "solar/shield": {
+            "status": shield,
+            "ts": datetime.now().isoformat(),
+        },
+        "solar/energy_mode": {
+            "mode": mode,
+            "solar_output": solar_output,
+            "ts": datetime.now().isoformat(),
+        },
+        "solar/alerts": {
+            "level": threat,
+            "ts": datetime.now().isoformat(),
+        },
     }
 
-    def _publish():
+    def _run():
+        client = None
         try:
             host = st.secrets["mqtt"]["host"]
             port = 8883
             username = st.secrets["mqtt"]["username"]
             password = st.secrets["mqtt"]["password"]
 
-            c = mqtt.Client(client_id=f"solar-{int(time.time())}", protocol=mqtt.MQTTv311)
-            c.username_pw_set(username, password)
-            c.tls_set(tls_version=ssl.PROTOCOL_TLS)
-            c.connect(host, port, keepalive=30)
-            c.loop_start()
-            time.sleep(1.5)
+            client = _create_mqtt_client(f"solar-os-{int(time.time())}")
+            client.username_pw_set(username, password)
+            client.tls_set(tls_version=ssl.PROTOCOL_TLS)
+
+            connected = threading.Event()
+
+            def on_connect(c, userdata, flags, rc):
+                if rc == 0:
+                    connected.set()
+
+            client.on_connect = on_connect
+            client.connect(host, port, keepalive=60)
+            client.loop_start()
+
+            if not connected.wait(timeout=5):
+                result["msg"] = "Connection timeout"
+                return
+
             for topic, payload in messages.items():
-                c.publish(topic, json.dumps(payload), qos=0)
-            time.sleep(1.5)
-            c.loop_stop()
-            c.disconnect()
+                retain = topic == "solar/weather"
+                info = client.publish(
+                    topic,
+                    json.dumps(payload),
+                    qos=1,
+                    retain=retain,
+                )
+                info.wait_for_publish(timeout=3)
+                published_count[0] += 1
+
+            time.sleep(1)
             result["success"] = True
-            result["msg"] = "Published"
+            result["msg"] = f"Published {published_count[0]} messages"
         except Exception as e:
             result["msg"] = str(e)
+        finally:
+            if client is not None:
+                try:
+                    client.loop_stop()
+                    client.disconnect()
+                except Exception:
+                    pass
 
-    t = threading.Thread(target=_publish, daemon=True)
+    t = threading.Thread(target=_run, daemon=True)
     t.start()
-    t.join(timeout=8)
+    t.join(timeout=10)
 
     return result["success"], result["msg"]

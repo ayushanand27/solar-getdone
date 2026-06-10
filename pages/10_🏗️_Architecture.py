@@ -51,7 +51,7 @@ NODES = [
         "name": "Weather Sensors",
         "subtitle": "Open-Meteo API",
         "x": 1,
-        "y": 8,
+        "y": 9,
         "layer": "input",
         "status": f"● {ctx['temp']}°C",
         "status_color": "#00C896",
@@ -61,7 +61,7 @@ NODES = [
         "name": "CV Module",
         "subtitle": "YOLOv8n",
         "x": 1,
-        "y": 5,
+        "y": 6,
         "layer": "input",
         "status": f"● {cv_label}",
         "status_color": "#F7B731" if ctx.get("cv_threat") else "#00C896",
@@ -71,7 +71,7 @@ NODES = [
         "name": "IoT Sensors",
         "subtitle": "Edge telemetry",
         "x": 1,
-        "y": 2,
+        "y": 3,
         "layer": "edge",
         "status": f"● {edge_latency}ms",
         "status_color": "#F97316",
@@ -81,7 +81,7 @@ NODES = [
         "name": "AI Decision Engine",
         "subtitle": "Rule + threat fusion",
         "x": 3,
-        "y": 9,
+        "y": 10,
         "layer": "ai",
         "status": f"● {ctx['mode'].upper()}",
         "status_color": "#F7B731",
@@ -91,7 +91,7 @@ NODES = [
         "name": "Threat Assessor",
         "subtitle": "Risk scoring",
         "x": 3,
-        "y": 7,
+        "y": 7.5,
         "layer": "ai",
         "status": f"● {ctx['threat_level']}",
         "status_color": "#EF4444" if ctx["threat_level"] in ("HIGH", "CRITICAL") else "#F7B731",
@@ -111,7 +111,7 @@ NODES = [
         "name": "Health Monitor",
         "subtitle": "Farm health score",
         "x": 3,
-        "y": 3,
+        "y": 2.5,
         "layer": "ai",
         "status": f"● {ctx.get('solar_output', 0)} W/m²",
         "status_color": "#00C896",
@@ -121,7 +121,7 @@ NODES = [
         "name": "Shield Controller",
         "subtitle": "Panel protection",
         "x": 5,
-        "y": 9,
+        "y": 10,
         "layer": "output",
         "status": f"{shield_dot} {ctx['shield']}",
         "status_color": shield_color,
@@ -131,7 +131,7 @@ NODES = [
         "name": "Battery Storage",
         "subtitle": "Li-ion bank",
         "x": 5,
-        "y": 7,
+        "y": 7.5,
         "layer": "output",
         "status": f"● {battery_level}%",
         "status_color": "#F7B731" if battery_level < 30 else "#00C896",
@@ -151,7 +151,7 @@ NODES = [
         "name": "Grid Export",
         "subtitle": "Time-of-day pricing",
         "x": 5,
-        "y": 3,
+        "y": 2.5,
         "layer": "output",
         "status": f"● {grid_status}",
         "status_color": "#00C896",
@@ -161,7 +161,7 @@ NODES = [
         "name": "HiveMQ MQTT",
         "subtitle": "Cloud broker",
         "x": 7,
-        "y": 9,
+        "y": 10,
         "layer": "cloud",
         "status": "● Live" if mqtt_live else "● Offline",
         "status_color": "#00C896" if mqtt_live else "#EF4444",
@@ -171,7 +171,7 @@ NODES = [
         "name": "AWS IoT Greengrass",
         "subtitle": "Edge sync",
         "x": 7,
-        "y": 7,
+        "y": 7.5,
         "layer": "cloud",
         "status": "● Synced" if not ctx.get("edge_mode") else "● Edge",
         "status_color": "#8B5CF6",
@@ -191,7 +191,7 @@ NODES = [
         "name": "Streamlit Dashboard",
         "subtitle": "Solar OS UI",
         "x": 7,
-        "y": 3,
+        "y": 2.5,
         "layer": "cloud",
         "status": f"● {ctx['city_name']}",
         "status_color": "#00C896",
@@ -219,8 +219,8 @@ EDGES = [
 ]
 
 NODE_LOOKUP = {node["id"]: node for node in NODES}
-MARKER_SIZE = 44
-NODE_PAD = 0.42
+MARKER_SIZE = 45
+NODE_PAD = 0.45
 
 
 def layer_color(layer):
@@ -314,10 +314,10 @@ def build_architecture_figure():
     for x, label, color in column_headers:
         fig.add_annotation(
             x=x,
-            y=10.2,
+            y=11.5,
             text=f"<b>{label}</b>",
             showarrow=False,
-            font=dict(size=13, color=color),
+            font=dict(size=12, color=color),
             yanchor="bottom",
         )
 
@@ -327,27 +327,27 @@ def build_architecture_figure():
             y=node["y"],
             text=f"<b>{node['name']}</b>",
             showarrow=False,
-            font=dict(size=14, color="#FFFFFF"),
+            font=dict(size=12, color="#FFFFFF"),
             yanchor="bottom",
-            yshift=32,
+            yshift=30,
         )
         fig.add_annotation(
             x=node["x"],
             y=node["y"],
             text=node["subtitle"],
             showarrow=False,
-            font=dict(size=13, color="#8B949E"),
+            font=dict(size=12, color="#8B949E"),
             yanchor="top",
-            yshift=-35,
+            yshift=-40,
         )
         fig.add_annotation(
             x=node["x"],
             y=node["y"],
             text=node["status"],
             showarrow=False,
-            font=dict(size=13, color=node["status_color"]),
+            font=dict(size=12, color=node["status_color"]),
             yanchor="top",
-            yshift=-50,
+            yshift=-55,
         )
 
     fig.update_layout(
@@ -370,14 +370,14 @@ def build_architecture_figure():
             zeroline=False,
             showticklabels=False,
             showline=False,
-            range=[0.5, 10.8],
+            range=[-0.5, 12.5],
             scaleanchor="x",
             scaleratio=1,
         ),
         plot_bgcolor="#0D1117",
         paper_bgcolor="#0D1117",
         font=dict(color="#E6EDF3"),
-        height=800,
+        height=850,
         margin=dict(l=30, r=30, t=90, b=30),
         legend=dict(
             orientation="h",

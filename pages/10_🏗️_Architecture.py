@@ -13,6 +13,15 @@ LAYER_COLORS = {
     "ai": "#F7B731",
     "output": "#00C896",
     "cloud": "#8B5CF6",
+    "edge": "#F97316",
+}
+
+LAYER_LABELS = {
+    "input": "Input",
+    "ai": "AI Processing",
+    "output": "Output",
+    "cloud": "Cloud",
+    "edge": "Edge / IoT",
 }
 
 PEAK_HOURS = {6, 7, 8, 9, 18, 19, 20, 21}
@@ -26,128 +35,226 @@ mqtt_status = st.session_state.get("mqtt_status", {})
 mqtt_live = mqtt_status.get("success", False)
 sns_count = st.session_state.get("sns_messages_today", 0)
 grid_status = "Export ready" if datetime.now().hour in PEAK_HOURS else "Idle"
+cv_label = ctx.get("cv_threat") or "Idle"
+edge_latency = ctx.get("edge_latency", 72)
+
+if ctx["shield"] == "CLOSED":
+    shield_dot, shield_color = "●", "#EF4444"
+elif ctx["shield"] == "READY":
+    shield_dot, shield_color = "●", "#F7B731"
+else:
+    shield_dot, shield_color = "●", "#00C896"
 
 NODES = [
     {
         "id": "weather",
         "name": "Weather Sensors",
         "subtitle": "Open-Meteo API",
-        "x": 0,
-        "y": 4.2,
+        "x": 1,
+        "y": 8,
         "layer": "input",
-        "status": f"🟢 {ctx['temp']}°C · {ctx['wind']} km/h",
+        "status": f"● {ctx['temp']}°C",
+        "status_color": "#00C896",
     },
     {
         "id": "cv",
         "name": "CV Module",
         "subtitle": "YOLOv8n",
-        "x": 0,
-        "y": 2.2,
+        "x": 1,
+        "y": 5.5,
         "layer": "input",
-        "status": f"{'🟡' if ctx.get('cv_threat') else '🟢'} {ctx.get('cv_threat') or 'No threat'}",
+        "status": f"● {cv_label}",
+        "status_color": "#F7B731" if ctx.get("cv_threat") else "#00C896",
+    },
+    {
+        "id": "iot",
+        "name": "IoT Sensors",
+        "subtitle": "Edge telemetry",
+        "x": 1,
+        "y": 3,
+        "layer": "edge",
+        "status": f"● {edge_latency}ms",
+        "status_color": "#F97316",
     },
     {
         "id": "ai_engine",
         "name": "AI Decision Engine",
         "subtitle": "Rule + threat fusion",
-        "x": 2.5,
-        "y": 3.2,
+        "x": 3,
+        "y": 8,
         "layer": "ai",
-        "status": f"🟢 {ctx['mode'].upper()} · {ctx['threat_level']}",
+        "status": f"● {ctx['mode'].upper()}",
+        "status_color": "#F7B731",
+    },
+    {
+        "id": "threat_assessor",
+        "name": "Threat Assessor",
+        "subtitle": "Risk scoring",
+        "x": 3,
+        "y": 6.5,
+        "layer": "ai",
+        "status": f"● {ctx['threat_level']}",
+        "status_color": "#EF4444" if ctx["threat_level"] in ("HIGH", "CRITICAL") else "#F7B731",
     },
     {
         "id": "energy_router",
         "name": "Energy Router",
         "subtitle": "Mode orchestration",
-        "x": 2.5,
-        "y": 1.4,
+        "x": 3,
+        "y": 5,
         "layer": "ai",
-        "status": f"🟢 Routing → {ctx['mode']}",
+        "status": f"● {ctx['status'][:18]}",
+        "status_color": "#F7B731",
+    },
+    {
+        "id": "health_monitor",
+        "name": "Health Monitor",
+        "subtitle": "Farm health score",
+        "x": 3,
+        "y": 3,
+        "layer": "ai",
+        "status": f"● {ctx.get('solar_output', 0)} W/m²",
+        "status_color": "#00C896",
     },
     {
         "id": "shield",
         "name": "Shield Controller",
         "subtitle": "Panel protection",
         "x": 5,
-        "y": 5,
+        "y": 8,
         "layer": "output",
-        "status": f"{'🔴' if ctx['shield'] == 'CLOSED' else '🟢'} {ctx['shield']}",
+        "status": f"{shield_dot} {ctx['shield']}",
+        "status_color": shield_color,
     },
     {
         "id": "battery",
         "name": "Battery Storage",
         "subtitle": "Li-ion bank",
         "x": 5,
-        "y": 4,
+        "y": 6.5,
         "layer": "output",
-        "status": f"{'🟡' if battery_level < 30 else '🟢'} {battery_level}%",
+        "status": f"● {battery_level}%",
+        "status_color": "#F7B731" if battery_level < 30 else "#00C896",
     },
     {
         "id": "h2",
         "name": "H₂ Electrolyzer",
         "subtitle": "Green hydrogen",
         "x": 5,
-        "y": 3,
+        "y": 5,
         "layer": "output",
-        "status": f"🟢 {h2_level}% · {h2_kg} kg today",
+        "status": f"● {h2_kg} kg today",
+        "status_color": "#00C896",
     },
     {
         "id": "grid",
         "name": "Grid Export",
-        "subtitle": "ToD pricing",
+        "subtitle": "Time-of-day pricing",
         "x": 5,
-        "y": 2,
+        "y": 3,
         "layer": "output",
-        "status": f"🟢 {grid_status}",
+        "status": f"● {grid_status}",
+        "status_color": "#00C896",
     },
     {
         "id": "hivemq",
-        "name": "HiveMQ Cloud",
-        "subtitle": "MQTT broker",
-        "x": 2.5,
-        "y": 5.5,
+        "name": "HiveMQ MQTT",
+        "subtitle": "Cloud broker",
+        "x": 7,
+        "y": 8,
         "layer": "cloud",
-        "status": f"{'🟢 Live' if mqtt_live else '🔴 Offline'}",
+        "status": "● Live" if mqtt_live else "● Offline",
+        "status_color": "#00C896" if mqtt_live else "#EF4444",
     },
     {
-        "id": "dashboard",
-        "name": "Streamlit Dashboard",
-        "subtitle": "Solar OS UI",
-        "x": 2.5,
-        "y": 0.3,
+        "id": "greengrass",
+        "name": "AWS IoT Greengrass",
+        "subtitle": "Edge sync",
+        "x": 7,
+        "y": 6.5,
         "layer": "cloud",
-        "status": f"🟢 {ctx['city_name']}",
+        "status": "● Synced" if not ctx.get("edge_mode") else "● Edge",
+        "status_color": "#8B5CF6",
     },
     {
         "id": "alerts",
         "name": "Email / SNS Alerts",
         "subtitle": "AWS SNS mock",
-        "x": 5,
-        "y": 0.8,
+        "x": 7,
+        "y": 5,
         "layer": "cloud",
-        "status": f"🟢 {sns_count} sent today",
+        "status": f"● {sns_count} sent",
+        "status_color": "#8B5CF6",
+    },
+    {
+        "id": "dashboard",
+        "name": "Streamlit Dashboard",
+        "subtitle": "Solar OS UI",
+        "x": 7,
+        "y": 3,
+        "layer": "cloud",
+        "status": f"● {ctx['city_name']}",
+        "status_color": "#00C896",
     },
 ]
 
 EDGES = [
     ("weather", "ai_engine"),
-    ("cv", "ai_engine"),
-    ("ai_engine", "shield"),
+    ("cv", "threat_assessor"),
+    ("iot", "ai_engine"),
+    ("threat_assessor", "ai_engine"),
     ("ai_engine", "energy_router"),
+    ("ai_engine", "health_monitor"),
+    ("ai_engine", "shield"),
     ("energy_router", "battery"),
     ("energy_router", "h2"),
     ("energy_router", "grid"),
+    ("health_monitor", "dashboard"),
     ("ai_engine", "hivemq"),
     ("weather", "hivemq"),
+    ("hivemq", "greengrass"),
     ("hivemq", "dashboard"),
-    ("ai_engine", "alerts"),
     ("shield", "alerts"),
+    ("ai_engine", "alerts"),
 ]
 
 NODE_LOOKUP = {node["id"]: node for node in NODES}
+MARKER_SIZE = 44
+NODE_PAD = 0.42
 
 
-def add_arrow(fig, x0, y0, x1, y1, color="#6B7280"):
+def layer_color(layer):
+    return LAYER_COLORS.get(layer, "#6B7280")
+
+
+def edge_endpoints(x0, y0, x1, y1, pad=NODE_PAD):
+    dx, dy = x1 - x0, y1 - y0
+    length = (dx**2 + dy**2) ** 0.5 or 1.0
+    ux, uy = dx / length, dy / length
+    return (
+        x0 + ux * pad,
+        y0 + uy * pad,
+        x1 - ux * pad,
+        y1 - uy * pad,
+    )
+
+
+def add_edge(fig, src_id, dst_id):
+    src = NODE_LOOKUP[src_id]
+    dst = NODE_LOOKUP[dst_id]
+    color = layer_color(src["layer"])
+    x0, y0, x1, y1 = edge_endpoints(src["x"], src["y"], dst["x"], dst["y"])
+
+    fig.add_trace(
+        go.Scatter(
+            x=[x0, x1],
+            y=[y0, y1],
+            mode="lines",
+            line=dict(color=color, width=2),
+            hoverinfo="skip",
+            showlegend=False,
+        )
+    )
     fig.add_annotation(
         x=x1,
         y=y1,
@@ -159,81 +266,125 @@ def add_arrow(fig, x0, y0, x1, y1, color="#6B7280"):
         ayref="y",
         showarrow=True,
         arrowhead=2,
-        arrowsize=1.2,
-        arrowwidth=1.5,
+        arrowsize=1.4,
+        arrowwidth=2,
         arrowcolor=color,
-        opacity=0.75,
+        opacity=0.95,
     )
 
 
 def build_architecture_figure():
     fig = go.Figure()
 
-    for layer, color in LAYER_COLORS.items():
+    for edge in EDGES:
+        add_edge(fig, edge[0], edge[1])
+
+    for layer in ("input", "edge", "ai", "output", "cloud"):
         layer_nodes = [n for n in NODES if n["layer"] == layer]
         if not layer_nodes:
             continue
+        color = layer_color(layer)
         fig.add_trace(
             go.Scatter(
                 x=[n["x"] for n in layer_nodes],
                 y=[n["y"] for n in layer_nodes],
-                mode="markers+text",
-                name=layer.title(),
+                mode="markers",
+                name=LAYER_LABELS[layer],
                 marker=dict(
-                    size=52,
+                    size=MARKER_SIZE,
                     color=color,
-                    line=dict(width=2, color="#161B22"),
-                    symbol="square",
+                    line=dict(width=3, color="#E6EDF3"),
+                    symbol="circle",
+                    opacity=0.95,
                 ),
-                text=[n["name"] for n in layer_nodes],
-                textposition="middle center",
-                textfont=dict(size=10, color="#FFFFFF"),
                 hovertext=[
-                    f"<b>{n['name']}</b><br>{n['subtitle']}<br>Status: {n['status']}"
+                    f"<b>{n['name']}</b><br>{n['subtitle']}<br>{n['status']}"
                     for n in layer_nodes
                 ],
                 hoverinfo="text",
             )
         )
 
-    for src_id, dst_id in EDGES:
-        src = NODE_LOOKUP[src_id]
-        dst = NODE_LOOKUP[dst_id]
-        add_arrow(fig, src["x"], src["y"], dst["x"], dst["y"])
+    column_headers = [
+        (1, "INPUT / SENSING", LAYER_COLORS["input"]),
+        (3, "AI PROCESSING", LAYER_COLORS["ai"]),
+        (5, "OUTPUT / ACTION", LAYER_COLORS["output"]),
+        (7, "CLOUD / COMM", LAYER_COLORS["cloud"]),
+    ]
+    for x, label, color in column_headers:
+        fig.add_annotation(
+            x=x,
+            y=9.4,
+            text=f"<b>{label}</b>",
+            showarrow=False,
+            font=dict(size=12, color=color),
+            yanchor="bottom",
+        )
 
     for node in NODES:
         fig.add_annotation(
             x=node["x"],
-            y=node["y"] - 0.55,
-            text=f"<i>{node['subtitle']}</i>",
+            y=node["y"] + 0.55,
+            text=f"<b>{node['name']}</b>",
             showarrow=False,
-            font=dict(size=9, color="#8B949E"),
+            font=dict(size=13, color="#FFFFFF"),
+            yanchor="bottom",
+        )
+        fig.add_annotation(
+            x=node["x"],
+            y=node["y"] - 0.35,
+            text=node["subtitle"],
+            showarrow=False,
+            font=dict(size=10, color="#8B949E"),
             yanchor="top",
         )
         fig.add_annotation(
             x=node["x"],
-            y=node["y"] - 0.85,
+            y=node["y"] - 0.72,
             text=node["status"],
             showarrow=False,
-            font=dict(size=9, color=LAYER_COLORS[node["layer"]]),
+            font=dict(size=10, color=node["status_color"]),
             yanchor="top",
         )
 
-    fig.add_annotation(x=0, y=5.9, text="<b>INPUT / SENSING</b>", showarrow=False, font=dict(size=11, color=LAYER_COLORS["input"]))
-    fig.add_annotation(x=2.5, y=5.9, text="<b>AI PROCESSING</b>", showarrow=False, font=dict(size=11, color=LAYER_COLORS["ai"]))
-    fig.add_annotation(x=5, y=5.9, text="<b>OUTPUT / ACTION</b>", showarrow=False, font=dict(size=11, color=LAYER_COLORS["output"]))
-    fig.add_annotation(x=2.5, y=-0.5, text="<b>CLOUD / COMMUNICATION</b>", showarrow=False, font=dict(size=11, color=LAYER_COLORS["cloud"]))
-
     fig.update_layout(
-        title="Solar OS — System Architecture & Live Data Flow",
-        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-0.8, 5.8]),
-        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-0.9, 6.2], scaleanchor="x", scaleratio=1),
+        title=dict(
+            text="Solar OS — System Architecture<br>"
+            "<sup style='color:#8B949E'>Real-time Edge AI Pipeline</sup>",
+            x=0.5,
+            xanchor="center",
+            font=dict(size=20, color="#E6EDF3"),
+        ),
+        xaxis=dict(
+            showgrid=False,
+            zeroline=False,
+            showticklabels=False,
+            showline=False,
+            range=[-0.2, 8.2],
+        ),
+        yaxis=dict(
+            showgrid=False,
+            zeroline=False,
+            showticklabels=False,
+            showline=False,
+            range=[1.2, 10],
+            scaleanchor="x",
+            scaleratio=1,
+        ),
         plot_bgcolor="#0D1117",
         paper_bgcolor="#0D1117",
         font=dict(color="#E6EDF3"),
-        height=620,
-        margin=dict(l=20, r=20, t=60, b=20),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+        height=700,
+        margin=dict(l=30, r=30, t=90, b=30),
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.08,
+            xanchor="center",
+            x=0.5,
+            bgcolor="rgba(0,0,0,0)",
+            font=dict(size=11, color="#E6EDF3"),
+        ),
         hovermode="closest",
     )
     return fig
@@ -242,20 +393,33 @@ def build_architecture_figure():
 st.title("🏗️ System Architecture")
 st.caption(f"Interactive data-flow map — live status for 📍 {ctx['city_name']}")
 
-legend_cols = st.columns(4)
+m1, m2, m3, m4 = st.columns(4)
+m1.metric("Total Nodes", len(NODES))
+m2.metric("Active Connections", len(EDGES))
+m3.metric("Live Data Streams", 4)
+m4.metric("Edge Latency", f"{edge_latency}ms")
+
+st.plotly_chart(build_architecture_figure(), use_container_width=True)
+
+legend_cols = st.columns(5)
 legend_items = [
-    ("🔵 Input / Sensing", LAYER_COLORS["input"]),
-    ("🟡 AI Processing", LAYER_COLORS["ai"]),
-    ("🟢 Output / Action", LAYER_COLORS["output"]),
-    ("🟣 Cloud / Communication", LAYER_COLORS["cloud"]),
+    ("Input", LAYER_COLORS["input"]),
+    ("AI Processing", LAYER_COLORS["ai"]),
+    ("Output", LAYER_COLORS["output"]),
+    ("Cloud", LAYER_COLORS["cloud"]),
+    ("Live Data", "#00C896"),
 ]
 for col, (label, color) in zip(legend_cols, legend_items):
     col.markdown(
-        f'<span style="color:{color};font-weight:600;">{label}</span>',
+        f"""
+<div style="display:flex;align-items:center;gap:8px;justify-content:center;">
+<span style="display:inline-block;width:16px;height:16px;background:{color};
+border-radius:3px;border:1px solid #30363D;"></span>
+<span style="color:#E6EDF3;font-size:13px;">{label}</span>
+</div>
+""",
         unsafe_allow_html=True,
     )
-
-st.plotly_chart(build_architecture_figure(), use_container_width=True)
 
 st.divider()
 st.subheader("📋 Component Summary")
@@ -265,6 +429,7 @@ with summary_cols[0]:
     st.markdown("**Input Layer**")
     st.markdown(f"- Weather: `{ctx['temp']}°C`, wind `{ctx['wind']} km/h`, rain `{ctx['rain']} mm`")
     st.markdown(f"- CV threat: `{ctx.get('cv_threat') or 'None'}`")
+    st.markdown(f"- IoT latency: `{edge_latency}ms`")
 with summary_cols[1]:
     st.markdown("**AI Layer**")
     st.markdown(f"- Mode: `{ctx['mode']}` · Threat: `{ctx['threat_level']}`")

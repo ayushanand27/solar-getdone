@@ -1,9 +1,6 @@
-import json
-import ssl
+import threading
 import time
-from datetime import datetime
 
-import paho.mqtt.client as mqtt
 import streamlit as st
 
 
@@ -22,61 +19,46 @@ def publish_if_due(solar_output, temp, wind, shield, mode, threat):
 
 
 def publish_to_hivemq(solar_output, temp, wind, shield, mode, threat):
-    try:
-        host = st.secrets["mqtt"]["host"]
-        port = int(st.secrets["mqtt"]["port"])
-        username = st.secrets["mqtt"]["username"]
-        password = st.secrets["mqtt"]["password"]
+    import json
+    import ssl
+    from datetime import datetime
 
-        messages = {
-            "solar/weather": {
-                "temp": temp,
-                "wind": wind,
-                "timestamp": datetime.now().isoformat(),
-            },
-            "solar/shield": {
-                "status": shield,
-                "timestamp": datetime.now().isoformat(),
-            },
-            "solar/energy_mode": {
-                "mode": mode,
-                "solar_output": solar_output,
-                "timestamp": datetime.now().isoformat(),
-            },
-            "solar/alerts": {
-                "level": threat,
-                "timestamp": datetime.now().isoformat(),
-            },
-        }
+    import paho.mqtt.client as mqtt
 
-        published = []
+    result = {"success": False, "msg": "Timeout"}
 
-        def on_connect(client, userdata, flags, rc):
-            if rc == 0:
-                for topic, payload in messages.items():
-                    client.publish(topic, json.dumps(payload), qos=0)
-                    published.append(topic)
+    messages = {
+        "solar/weather": {"temp": temp, "wind": wind, "ts": datetime.now().isoformat()},
+        "solar/shield": {"status": shield, "ts": datetime.now().isoformat()},
+        "solar/energy_mode": {"mode": mode, "solar": solar_output, "ts": datetime.now().isoformat()},
+        "solar/alerts": {"level": threat, "ts": datetime.now().isoformat()},
+    }
 
-        def on_publish(client, userdata, mid):
-            if len(published) >= len(messages):
-                client.disconnect()
+    def _publish():
+        try:
+            host = st.secrets["mqtt"]["host"]
+            port = 8883
+            username = st.secrets["mqtt"]["username"]
+            password = st.secrets["mqtt"]["password"]
 
-        client = mqtt.Client(
-            client_id=f"solar-os-{int(time.time())}",
-            protocol=mqtt.MQTTv311,
-        )
-        client.username_pw_set(username, password)
-        client.tls_set(tls_version=ssl.PROTOCOL_TLS)
-        client.on_connect = on_connect
-        client.on_publish = on_publish
+            c = mqtt.Client(client_id=f"solar-{int(time.time())}", protocol=mqtt.MQTTv311)
+            c.username_pw_set(username, password)
+            c.tls_set(tls_version=ssl.PROTOCOL_TLS)
+            c.connect(host, port, keepalive=30)
+            c.loop_start()
+            time.sleep(1.5)
+            for topic, payload in messages.items():
+                c.publish(topic, json.dumps(payload), qos=0)
+            time.sleep(1.5)
+            c.loop_stop()
+            c.disconnect()
+            result["success"] = True
+            result["msg"] = "Published"
+        except Exception as e:
+            result["msg"] = str(e)
 
-        client.connect(host, port, keepalive=10)
-        client.loop_start()
-        time.sleep(2)
-        client.loop_stop()
-        client.disconnect()
+    t = threading.Thread(target=_publish, daemon=True)
+    t.start()
+    t.join(timeout=8)
 
-        return True, "Connected"
-
-    except Exception as e:
-        return False, str(e)
+    return result["success"], result["msg"]

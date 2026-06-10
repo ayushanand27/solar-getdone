@@ -190,45 +190,104 @@ def render_farm_skeleton_cards():
         with col:
             st.markdown(
                 f"""
-<div style="background:#161B22;border:1px solid #30363D;border-radius:10px;
-padding:16px;min-height:280px;">
+<div style="background:#161B22;border:1px solid #30363D;border-radius:10px;padding:16px;">
 <div style="color:#8B949E;font-size:13px;margin-bottom:8px;">⏳ Loading…</div>
 <div style="color:#E6EDF3;font-size:16px;font-weight:600;margin-bottom:12px;">{farm['name']}</div>
 <div style="background:#21262D;height:10px;border-radius:4px;margin:10px 0;"></div>
 <div style="background:#21262D;height:10px;border-radius:4px;width:75%;margin:10px 0;"></div>
 <div style="background:#21262D;height:10px;border-radius:4px;width:55%;margin:10px 0;"></div>
-<div style="background:#21262D;height:32px;border-radius:6px;margin-top:20px;"></div>
 </div>
 """,
                 unsafe_allow_html=True,
             )
 
 
-def render_farm_overview(all_farms):
+def render_farm_detail(farm_data, ctx):
+    d1, d2, d3, d4, d5 = st.columns(5)
+    d1.metric("Solar Output", f"{farm_data['solar_output']} W/m²")
+    d2.metric("Temperature", f"{farm_data['temp']}°C")
+    d3.metric("Wind", f"{farm_data['wind']} km/h")
+    d4.metric("H₂ Today", f"{farm_data['h2_kg']} kg")
+    d5.metric("Health Score", f"{farm_data['health_score']}/100", farm_data["health_grade"])
+
+    if farm_data["mode"] == "protection":
+        st.error(f"**{farm_data['status']}** — {farm_data['action']}")
+    elif farm_data["mode"] == "harvest":
+        st.success(f"**{farm_data['status']}** — {farm_data['action']}")
+    elif farm_data["mode"] in ("monitor", "store"):
+        st.warning(f"**{farm_data['status']}** — {farm_data['action']}")
+    else:
+        st.info(f"**{farm_data['status']}** — {farm_data['action']}")
+
+    s1, s2, s3 = st.columns(3)
+    with s1:
+        if farm_data["shield"] == "CLOSED":
+            st.error(f"### 🔒 SHIELD: CLOSED\n**Reason:** {farm_data['shield_reason']}")
+        elif farm_data["shield"] == "READY":
+            st.warning(f"### ⚠️ SHIELD: STANDBY\n**Reason:** {farm_data['shield_reason']}")
+        else:
+            st.success(f"### ✅ SHIELD: OPEN\n**Reason:** {farm_data['shield_reason']}")
+    with s2:
+        st.markdown("### 🎯 Threat Assessment")
+        render_threat(farm_data["threat_level"])
+        st.caption(f"Weather code: {farm_data['wcode']} | Rain: {farm_data['rain']} mm")
+    with s3:
+        st.markdown("### 📍 Location")
+        st.markdown(f"**Resolved:** {farm_data['city_name']}")
+        st.caption(f"Lat {farm_data['lat']:.2f} | Lon {farm_data['lon']:.2f}")
+
+    st.markdown("#### ☀️ Hourly Radiation Forecast")
+    detail_df = pd.DataFrame(
+        {
+            "Hour": [t[11:16] for t in farm_data["hours"]],
+            "Radiation (W/m²)": farm_data["radiation"],
+        }
+    )
+    detail_df["Est. Output (W/m²)"] = detail_df["Radiation (W/m²)"] * 0.22
+    if ctx["sim_event"] == "dust":
+        detail_df["Est. Output (W/m²)"] = detail_df["Est. Output (W/m²)"] * 0.75
+    st.line_chart(detail_df.set_index("Hour")["Est. Output (W/m²)"])
+
+    st.markdown("#### 🤖 24hr AI Decision Log")
+    st.dataframe(
+        pd.DataFrame(build_decision_log(farm_data["hours"], farm_data["radiation"], ctx["sim_event"])),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
+def render_farm_overview(all_farms, ctx):
     st.subheader("🏭 Farm Overview")
     cols = st.columns(len(all_farms))
     for col, farm in zip(cols, all_farms):
-        border_color = (
-            "2px solid #00C896"
-            if farm["name"] == st.session_state.selected_farm
-            else "1px solid #30363D"
-        )
+        selected = farm["name"] == st.session_state.selected_farm
+        border_color = "#00C896" if selected else "#30363D"
         with col:
             st.markdown(
-                f'<div style="border:{border_color}; border-radius:10px; padding:16px; min-height:280px;">',
+                f"""
+<div style="border:{'2px' if selected else '1px'} solid {border_color};
+border-radius:10px;padding:16px;margin-bottom:8px;">
+<div style="color:#E6EDF3;font-size:18px;font-weight:600;">{farm['name']}</div>
+<div style="color:#8B949E;font-size:12px;margin:4px 0 12px;">📍 {farm['region']}</div>
+<div style="color:#F7B731;font-size:22px;font-weight:bold;">{farm['solar_output']} W/m²</div>
+<div style="color:#8B949E;font-size:11px;margin-bottom:8px;">Solar Output</div>
+<div style="color:#E6EDF3;font-size:13px;margin:4px 0;">Health: {farm['health_score']}/100 {farm['health_grade']}</div>
+<div style="color:#E6EDF3;font-size:13px;margin:4px 0;">Shield: {farm['shield_display']}</div>
+<div style="color:#E6EDF3;font-size:13px;margin:4px 0;">Energy Mode: {farm['status']}</div>
+<div style="color:#8B949E;font-size:12px;margin-top:8px;">🌡️ {farm['temp']}°C | 💨 {farm['wind']} km/h</div>
+</div>
+""",
                 unsafe_allow_html=True,
             )
-            st.markdown(f"### {farm['name']}")
-            st.caption(f"📍 {farm['region']}")
-            st.metric("Solar Output", f"{farm['solar_output']} W/m²")
-            st.markdown(f"**Health:** {farm['health_score']}/100 {farm['health_grade']}")
-            st.markdown(f"**Shield:** {farm['shield_display']}")
-            st.markdown(f"**Energy Mode:** {farm['status']}")
             render_threat(farm["threat_level"])
-            st.caption(f"🌡️ {farm['temp']}°C | 💨 {farm['wind']} km/h")
             if st.button("View Details", key=f"btn_{farm['name']}", use_container_width=True):
                 st.session_state.selected_farm = farm["name"]
-            st.markdown("</div>", unsafe_allow_html=True)
+                st.rerun()
+
+    selected_name = st.session_state.selected_farm
+    farm_data = next(f for f in all_farms if f["name"] == selected_name)
+    with st.expander(f"📊 {selected_name} — Details", expanded=True):
+        render_farm_detail(farm_data, ctx)
 
 
 def build_decision_log(hours, radiation, sim_event):
@@ -314,62 +373,4 @@ chart = (
 st.altair_chart(chart, use_container_width=True)
 
 st.divider()
-render_farm_overview(all_farms)
-
-st.divider()
-selected = st.session_state.selected_farm
-farm_data = [f for f in all_farms if f["name"] == selected][0]
-
-st.subheader(f"🔍 Farm Detail — {farm_data['name']}")
-
-d1, d2, d3, d4, d5 = st.columns(5)
-d1.metric("Solar Output", f"{farm_data['solar_output']} W/m²")
-d2.metric("Temperature", f"{farm_data['temp']}°C")
-d3.metric("Wind", f"{farm_data['wind']} km/h")
-d4.metric("H₂ Today", f"{farm_data['h2_kg']} kg")
-d5.metric("Health Score", f"{farm_data['health_score']}/100", farm_data["health_grade"])
-
-if farm_data["mode"] == "protection":
-    st.error(f"**{farm_data['status']}** — {farm_data['action']}")
-elif farm_data["mode"] == "harvest":
-    st.success(f"**{farm_data['status']}** — {farm_data['action']}")
-elif farm_data["mode"] in ("monitor", "store"):
-    st.warning(f"**{farm_data['status']}** — {farm_data['action']}")
-else:
-    st.info(f"**{farm_data['status']}** — {farm_data['action']}")
-
-s1, s2, s3 = st.columns(3)
-with s1:
-    if farm_data["shield"] == "CLOSED":
-        st.error(f"### 🔒 SHIELD: CLOSED\n**Reason:** {farm_data['shield_reason']}")
-    elif farm_data["shield"] == "READY":
-        st.warning(f"### ⚠️ SHIELD: STANDBY\n**Reason:** {farm_data['shield_reason']}")
-    else:
-        st.success(f"### ✅ SHIELD: OPEN\n**Reason:** {farm_data['shield_reason']}")
-with s2:
-    st.markdown("### 🎯 Threat Assessment")
-    render_threat(farm_data["threat_level"])
-    st.caption(f"Weather code: {farm_data['wcode']} | Rain: {farm_data['rain']} mm")
-with s3:
-    st.markdown("### 📍 Location")
-    st.markdown(f"**Resolved:** {farm_data['city_name']}")
-    st.caption(f"Lat {farm_data['lat']:.2f} | Lon {farm_data['lon']:.2f}")
-
-st.markdown("#### ☀️ Hourly Radiation Forecast")
-detail_df = pd.DataFrame(
-    {
-        "Hour": [t[11:16] for t in farm_data["hours"]],
-        "Radiation (W/m²)": farm_data["radiation"],
-    }
-)
-detail_df["Est. Output (W/m²)"] = detail_df["Radiation (W/m²)"] * 0.22
-if ctx["sim_event"] == "dust":
-    detail_df["Est. Output (W/m²)"] = detail_df["Est. Output (W/m²)"] * 0.75
-st.line_chart(detail_df.set_index("Hour")["Est. Output (W/m²)"])
-
-st.markdown("#### 🤖 24hr AI Decision Log")
-st.dataframe(
-    pd.DataFrame(build_decision_log(farm_data["hours"], farm_data["radiation"], ctx["sim_event"])),
-    use_container_width=True,
-    hide_index=True,
-)
+render_farm_overview(all_farms, ctx)

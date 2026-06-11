@@ -21,6 +21,7 @@ def get_weather(lat, lon):
         f"&current=temperature_2m,weathercode,windspeed_10m,precipitation"
         f"&hourly=shortwave_radiation"
         f"&forecast_days=1"
+        f"&timezone=auto"
     )
     try:
         r = requests.get(url, timeout=10)

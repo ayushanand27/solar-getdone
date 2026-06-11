@@ -5,8 +5,6 @@ st.set_page_config(page_title="Solar OS", layout="wide", page_icon="☀️")
 if "selected_farm" not in st.session_state:
     st.session_state.selected_farm = "Jaisalmer Solar Park"
 
-from concurrent.futures import ThreadPoolExecutor
-
 import altair as alt
 import pandas as pd
 import plotly.express as px
@@ -102,8 +100,7 @@ def estimate_h2_kg(radiation):
 
 @st.cache_data(ttl=300)
 def fetch_all_farms(sim_event):
-    with ThreadPoolExecutor(max_workers=5) as pool:
-        return list(pool.map(lambda f: load_farm(f, sim_event), FARMS))
+    return [load_farm(farm, sim_event) for farm in FARMS]
 
 
 def load_farm(farm, sim_event):
@@ -111,7 +108,7 @@ def load_farm(farm, sim_event):
     data = get_weather(lat, lon)
     current = data["current"]
     hourly = data["hourly"]
-    radiation = hourly["shortwave_radiation"]
+    radiation = [float(r or 0) for r in hourly["shortwave_radiation"]]
 
     status, action, mode, solar_output, shield, shield_reason, threat_level = ai_decision(
         current["weathercode"],
@@ -240,13 +237,25 @@ def render_farm_detail(farm_data, ctx):
     detail_df = pd.DataFrame(
         {
             "Hour": [t[11:16] for t in farm_data["hours"]],
-            "Radiation (W/m²)": farm_data["radiation"],
+            "Radiation (W/m²)": [float(r or 0) for r in farm_data["radiation"]],
         }
     )
-    detail_df["Est. Output (W/m²)"] = detail_df["Radiation (W/m²)"] * 0.22
+    detail_df["Est. Output (W/m²)"] = (detail_df["Radiation (W/m²)"] * 0.22).round(1)
     if ctx["sim_event"] == "dust":
-        detail_df["Est. Output (W/m²)"] = detail_df["Est. Output (W/m²)"] * 0.75
-    st.line_chart(detail_df.set_index("Hour")["Est. Output (W/m²)"])
+        detail_df["Est. Output (W/m²)"] = (detail_df["Est. Output (W/m²)"] * 0.75).round(1)
+        st.caption("⚠️ Dust storm active — showing 25% efficiency loss")
+    hour_order = detail_df["Hour"].tolist()
+    radiation_chart = (
+        alt.Chart(detail_df)
+        .mark_line(point=True, color="#F7B731")
+        .encode(
+            x=alt.X("Hour:N", sort=hour_order, title="Hour"),
+            y=alt.Y("Est. Output (W/m²):Q", title="Est. Output (W/m²)", scale=alt.Scale(zero=True)),
+            tooltip=["Hour", "Radiation (W/m²)", "Est. Output (W/m²)"],
+        )
+        .properties(height=280)
+    )
+    st.altair_chart(radiation_chart, use_container_width=True)
 
     st.markdown("#### 🤖 24hr AI Decision Log")
     st.dataframe(

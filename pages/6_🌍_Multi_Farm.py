@@ -274,12 +274,12 @@ border-radius:10px;padding:16px;margin-bottom:8px;">
 <div style="color:#E6EDF3;font-size:13px;margin:4px 0;">Health: {farm['health_score']}/100 {farm['health_grade']}</div>
 <div style="color:#E6EDF3;font-size:13px;margin:4px 0;">Shield: {farm['shield_display']}</div>
 <div style="color:#E6EDF3;font-size:13px;margin:4px 0;">Energy Mode: {farm['status']}</div>
+<div style="color:#E6EDF3;font-size:13px;margin:4px 0;">Threat: {threat_badge(farm['threat_level'])}</div>
 <div style="color:#8B949E;font-size:12px;margin-top:8px;">🌡️ {farm['temp']}°C | 💨 {farm['wind']} km/h</div>
 </div>
 """,
                 unsafe_allow_html=True,
             )
-            render_threat(farm["threat_level"])
             if st.button("View Details", key=f"btn_{farm['name']}", use_container_width=True):
                 st.session_state.selected_farm = farm["name"]
                 st.rerun()

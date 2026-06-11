@@ -37,12 +37,12 @@ def render_sidebar():
     st.sidebar.title("🧪 Threat Simulator")
     auto_sim = st.sidebar.toggle("⚡ Auto Simulation", value=False, key="auto_sim_toggle")
     st.sidebar.caption("Auto generates random threat events every 5s")
-    bird_btn = st.sidebar.button("🐦 Bird Attack", use_container_width=True)
-    dust_btn = st.sidebar.button("🌫️ Dust Storm", use_container_width=True)
+    bird_active = st.sidebar.toggle("🐦 Bird Attack", value=False, key="bird_sim_toggle")
+    dust_active = st.sidebar.toggle("🌫️ Dust Storm", value=False, key="dust_sim_toggle")
 
-    if bird_btn:
+    if bird_active:
         sim_event = "bird"
-    elif dust_btn:
+    elif dust_active:
         sim_event = "dust"
     elif auto_sim:
         random.seed(int(time.time()) // 5)
@@ -59,16 +59,28 @@ def render_sidebar():
 
     st.sidebar.divider()
     st.sidebar.title("🔬 CV Detection")
-    cv_source = st.sidebar.radio("Image Source", ["📁 Use Sample Image", "📤 Upload My Image"], key="cv_source")
+    cv_source = st.sidebar.radio(
+        "Image Source",
+        ["📁 Use Sample Image", "📤 Upload My Image"],
+        index=1,
+        key="cv_source",
+    )
     cv_image = None
     cv_filename = None
 
     if cv_source == "📁 Use Sample Image":
-        sample_choice = st.sidebar.selectbox("Select Sample", SAMPLE_IMAGES, key="cv_sample_choice")
-        sample_path = SAMPLES_DIR / sample_choice
-        if sample_path.exists():
-            cv_filename = sample_choice
-            cv_image = Image.open(sample_path).convert("RGB")
+        sample_options = ["— Select —", *SAMPLE_IMAGES]
+        sample_choice = st.sidebar.selectbox(
+            "Select Sample",
+            sample_options,
+            index=0,
+            key="cv_sample_choice",
+        )
+        if sample_choice != "— Select —":
+            sample_path = SAMPLES_DIR / sample_choice
+            if sample_path.exists():
+                cv_filename = sample_choice
+                cv_image = Image.open(sample_path).convert("RGB")
     else:
         uploaded_file = st.sidebar.file_uploader("Upload Image", type=["png", "jpg", "jpeg"], key="cv_upload")
         if uploaded_file is not None:

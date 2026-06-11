@@ -11,6 +11,12 @@ from utils.cv_module import SAMPLE_IMAGES, SAMPLES_DIR, run_cv_detection
 from utils.weather import get_7day, get_coordinates, get_weather
 
 
+@st.fragment(run_every=5)
+def _auto_sim_scheduler():
+    if st.session_state.get("auto_sim_toggle"):
+        st.rerun()
+
+
 def init_session_state():
     defaults = {
         "city": "Jaipur",
@@ -37,20 +43,32 @@ def render_sidebar():
     st.sidebar.title("🧪 Threat Simulator")
     auto_sim = st.sidebar.toggle("⚡ Auto Simulation", value=False, key="auto_sim_toggle")
     st.sidebar.caption("Auto generates random threat events every 5s")
-    bird_active = st.sidebar.toggle("🐦 Bird Attack", value=False, key="bird_sim_toggle")
-    dust_active = st.sidebar.toggle("🌫️ Dust Storm", value=False, key="dust_sim_toggle")
+    bird_active = st.sidebar.toggle(
+        "🐦 Bird Attack", value=False, key="bird_sim_toggle", disabled=auto_sim
+    )
+    dust_active = st.sidebar.toggle(
+        "🌫️ Dust Storm", value=False, key="dust_sim_toggle", disabled=auto_sim
+    )
 
-    if bird_active:
+    if auto_sim:
+        random.seed(int(time.time()) // 5)
+        sim_event = random.choice([None, None, None, "bird", "dust", "bird", "dust"])
+    elif bird_active:
         sim_event = "bird"
     elif dust_active:
         sim_event = "dust"
-    elif auto_sim:
-        random.seed(int(time.time()) // 5)
-        sim_event = random.choice([None, None, None, "bird", "dust", "bird", "dust"])
     else:
         sim_event = None
 
-    if sim_event == "bird":
+    if auto_sim:
+        st.sidebar.warning("⚡ Auto simulation ON — cycling every 5s")
+        if sim_event == "bird":
+            st.sidebar.error("🐦 Bird activity detected!")
+        elif sim_event == "dust":
+            st.sidebar.error("🌫️ Dust storm detected!")
+        else:
+            st.sidebar.info("✅ No threat this cycle")
+    elif sim_event == "bird":
         st.sidebar.error("🐦 Bird activity detected!")
     elif sim_event == "dust":
         st.sidebar.error("🌫️ Dust storm detected!")
@@ -206,8 +224,7 @@ def setup_app():
     }
 
     if sidebar["auto_sim"]:
-        time.sleep(5)
-        st.rerun()
+        _auto_sim_scheduler()
 
     return ctx
 

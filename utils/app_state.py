@@ -185,7 +185,7 @@ def setup_app():
     wind = current["windspeed_10m"]
     rain = current["precipitation"]
     wcode = current["weathercode"]
-    radiation = hourly["shortwave_radiation"]
+    radiation = [float(r or 0) for r in hourly["shortwave_radiation"]]
     hours = hourly["time"]
 
     status, action, mode, solar_output, shield, shield_reason, threat_level = ai_decision(

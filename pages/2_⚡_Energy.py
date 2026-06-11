@@ -1,6 +1,7 @@
 import streamlit as st
 st.set_page_config(page_title="Solar OS", layout="wide", page_icon="☀️")
 
+import altair as alt
 import pandas as pd
 
 from utils.app_state import setup_app
@@ -11,12 +12,28 @@ st.title("⚡ Energy Management")
 st.caption(f"Storage, hydrogen, and hourly AI decisions | 📍 {ctx['city_name']}")
 
 st.subheader("☀️ Today's Solar Radiation Forecast")
-df = pd.DataFrame({"Time": ctx["hours"], "Radiation (W/m²)": ctx["radiation"]})
-df["Estimated Output (W/m²)"] = df["Radiation (W/m²)"] * 0.22
+df = pd.DataFrame(
+    {
+        "Hour": [t[11:16] for t in ctx["hours"]],
+        "Radiation (W/m²)": [float(r or 0) for r in ctx["radiation"]],
+    }
+)
+df["Estimated Output (W/m²)"] = (df["Radiation (W/m²)"] * 0.22).round(1)
 if ctx["sim_event"] == "dust":
-    df["Estimated Output (W/m²)"] = df["Estimated Output (W/m²)"] * 0.75
+    df["Estimated Output (W/m²)"] = (df["Estimated Output (W/m²)"] * 0.75).round(1)
     st.caption("⚠️ Dust storm active — showing 25% efficiency loss")
-st.line_chart(df.set_index("Time")["Estimated Output (W/m²)"])
+hour_order = df["Hour"].tolist()
+radiation_chart = (
+    alt.Chart(df)
+    .mark_line(point=True, color="#F7B731")
+    .encode(
+        x=alt.X("Hour:N", sort=hour_order, title="Hour"),
+        y=alt.Y("Estimated Output (W/m²):Q", title="Estimated Output (W/m²)", scale=alt.Scale(zero=True)),
+        tooltip=["Hour", "Radiation (W/m²)", "Estimated Output (W/m²)"],
+    )
+    .properties(height=280)
+)
+st.altair_chart(radiation_chart, use_container_width=True)
 
 st.subheader("🧪 Hydrogen Storage Simulation")
 h2_stored = round(sum(r * 0.22 * 0.7 for r in ctx["radiation"] if r > 100) / 1000, 2)

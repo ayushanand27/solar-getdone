@@ -25,18 +25,26 @@ def maybe_send_email(alert_type, message):
         return
     to_email = st.session_state.get("alert_email", "").strip()
     if not to_email:
+        try:
+            to_email = st.secrets["email"]["recipient"].strip()
+        except (KeyError, FileNotFoundError, AttributeError, TypeError):
+            to_email = ""
+    if not to_email:
         st.session_state.last_email_status = "❌ Email failed: no recipient address"
         return
     try:
         from utils.email_alerts import send_email_alert
 
-        send_email_alert(alert_type, message, to_email)
-        st.session_state.last_email_status = f"✅ Email sent to {to_email}"
+        success, status_msg = send_email_alert(alert_type, message, to_email)
+        if success:
+            st.session_state.last_email_status = f"✅ Email sent to {to_email}"
+        else:
+            st.session_state.last_email_status = f"❌ Email failed: {status_msg}"
     except Exception as exc:
         st.session_state.last_email_status = f"❌ Email failed: {exc}"
 
 
-def append_alert(alert_type, message, channel=None, status="✅ Delivered"):
+def append_alert(alert_type, message, channel=None, status="✅ Delivered", send_email=True):
     init_alert_state()
     channel = channel or _pick_channel()
     log = st.session_state.alert_log
@@ -54,7 +62,8 @@ def append_alert(alert_type, message, channel=None, status="✅ Delivered"):
     st.session_state.alert_log = log[-10:]
     st.session_state.sns_messages_today += 1
     st.session_state.latest_alert_preview = message
-    maybe_send_email(alert_type, message)
+    if send_email:
+        maybe_send_email(alert_type, message)
     return True
 
 

@@ -9,13 +9,14 @@ from utils.app_state import render_edge_banner, setup_app
 from utils.mqtt_client import publish_to_hivemq
 from utils.mobile_alerts import (
     SNS_TOPIC_ARN,
+    append_alert,
     init_alert_state,
     latest_phone_message,
     process_auto_alerts,
     render_alert_config,
-    send_test_alert,
     sns_estimated_cost,
 )
+from utils.email_alerts import send_email_alert
 from utils.mqtt_sim import publish_mqtt_messages
 
 ctx = setup_app()
@@ -132,7 +133,43 @@ alert_config = render_alert_config()
 process_auto_alerts(ctx, alert_config)
 
 if st.button("🔔 Test Alert", use_container_width=False):
-    send_test_alert(ctx["city_name"])
+    to_email = st.session_state.get("alert_email", "").strip()
+    if not to_email:
+        try:
+            to_email = st.secrets["email"]["recipient"].strip()
+        except (KeyError, FileNotFoundError, AttributeError, TypeError):
+            to_email = ""
+
+    if not to_email:
+        st.error("No email configured")
+    else:
+        city = st.session_state.get("city_name", ctx["city_name"])
+        test_message = (
+            f"Test alert from Solar OS — {city} farm online and monitoring."
+        )
+        append_alert(
+            "Test",
+            test_message,
+            channel="Push",
+            status="📤 Sending",
+            send_email=False,
+        )
+
+        if st.session_state.get("alert_email_enabled", True):
+            success, msg = send_email_alert(
+                "Test Alert",
+                f"Solar OS is online and monitoring your farm at {city}. "
+                f"All systems operational.",
+                to_email,
+            )
+            if success:
+                st.session_state.last_email_status = f"✅ Email sent to {to_email}"
+                st.success(f"✅ Email sent to {to_email}")
+            else:
+                st.session_state.last_email_status = f"❌ Email failed: {msg}"
+                st.error(f"❌ Email failed: {msg}")
+        else:
+            st.info("Email alerts disabled — toggle on to send")
 
 if st.session_state.get("last_email_status"):
     status_msg = st.session_state.last_email_status

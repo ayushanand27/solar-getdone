@@ -1,8 +1,8 @@
-from datetime import datetime
+from utils.weather import radiation_index
 
 
-def ai_decision(wcode, wind, rain, radiation, sim_event):
-    hr = min(datetime.now().hour, len(radiation) - 1)
+def ai_decision(wcode, wind, rain, radiation, sim_event, hours=None):
+    hr = radiation_index(radiation, hours)
     dust_factor = 0.75 if sim_event == "dust" else 1.0
     solar_output = round(radiation[hr] * 0.22 * dust_factor, 1)
 

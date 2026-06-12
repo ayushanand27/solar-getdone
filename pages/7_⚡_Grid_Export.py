@@ -9,11 +9,11 @@ import numpy as np
 import pandas as pd
 
 from utils.app_state import setup_app
-
 from utils.grid_pricing import (
     FLAT_RATE,
     grid_price,
 )
+from utils.weather import current_hour_ist
 
 
 def hour_from_time(time_str):
@@ -113,7 +113,7 @@ ctx = setup_app()
 st.title("⚡ Grid Export Optimization")
 st.caption(f"AI-driven grid export timing | 📍 {ctx['city_name']}")
 
-current_hour = datetime.now().hour
+current_hour = current_hour_ist()
 current_price, current_period = grid_price(current_hour)
 battery_level = ctx.get("battery_level", st.session_state.get("battery_level", min(100, int(ctx["solar_output"] / 2))))
 current_action, _, _ = recommend_action(current_hour, ctx["solar_output"], battery_level)

@@ -1,5 +1,23 @@
+from datetime import datetime, timedelta, timezone
+
 import requests
 import streamlit as st
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def current_hour_ist():
+    return datetime.now(IST).hour
+
+
+def radiation_index(radiation, hours=None):
+    """Map current IST hour to the radiation array (Open-Meteo uses timezone=auto local hours)."""
+    hr = current_hour_ist()
+    if hours and len(hours) >= len(radiation):
+        labels = [int(t[11:13]) for t in hours[: len(radiation)]]
+        if hr in labels:
+            return labels.index(hr)
+    return min(hr, len(radiation) - 1)
 
 
 @st.cache_data(ttl=600)

@@ -7,6 +7,7 @@ from datetime import datetime
 import plotly.graph_objects as go
 
 from utils.app_state import setup_app
+from utils.weather import current_hour_ist
 
 LAYER_COLORS = {
     "input": "#3B82F6",
@@ -34,7 +35,7 @@ h2_level = min(100, int(h2_kg * 40))
 mqtt_status = st.session_state.get("mqtt_status", {})
 mqtt_live = mqtt_status.get("success", False)
 sns_count = st.session_state.get("sns_messages_today", 0)
-grid_status = "Export ready" if datetime.now().hour in PEAK_HOURS else "Idle"
+grid_status = "Export ready" if current_hour_ist() in PEAK_HOURS else "Idle"
 cv_label = ctx.get("cv_threat") or "Idle"
 edge_latency = ctx.get("edge_latency", 72)
 

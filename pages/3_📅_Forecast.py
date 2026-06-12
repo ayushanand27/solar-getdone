@@ -6,6 +6,7 @@ from datetime import datetime
 import pandas as pd
 
 from utils.app_state import setup_app
+from utils.weather import current_hour_ist
 
 ctx = setup_app()
 
@@ -64,7 +65,7 @@ if ctx["wind"] > 60:
     alerts.append(("HIGH", "💨 EXTREME WIND", f"{ctx['wind']} km/h — shield closed."))
 if ctx["wind"] > 40:
     alerts.append(("MEDIUM", "⚠️ HIGH WIND", f"{ctx['wind']} km/h — standby."))
-if ctx["solar_output"] < 10 and 7 < datetime.now().hour < 17:
+if ctx["solar_output"] < 10 and 7 < current_hour_ist() < 17:
     alerts.append(("MEDIUM", "☁️ LOW SOLAR", f"Only {ctx['solar_output']} W/m² during daylight."))
 if ctx["sim_event"] == "bird":
     alerts.append(("HIGH", "🐦 BIRD DETECTED", "Deterrent active. Shield partially closing."))

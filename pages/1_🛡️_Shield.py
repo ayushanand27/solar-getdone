@@ -3,7 +3,8 @@ import streamlit as st
 st.set_page_config(page_title="Solar OS", layout="wide", page_icon="☀️")
 
 from utils.ai_engine import ai_decision
-from utils.app_state import setup_app
+from utils.app_state import _auto_sim_scheduler, setup_app
+from utils.weather import radiation_index
 
 ctx = setup_app()
 
@@ -18,7 +19,27 @@ status, action, mode, solar_output, shield, shield_reason, threat_level = ai_dec
     ctx["rain"],
     ctx["radiation"],
     sim_event,
+    ctx.get("hours"),
 )
+
+if sim_event == "bird":
+    shield = "READY"
+    threat_level = "MEDIUM"
+    status = "🛡️ SHIELD PARTIAL"
+    action = "Bird activity — deterrent active, partial shield"
+    mode = "monitor"
+    shield_reason = "Bird swarm detected by camera"
+elif sim_event == "dust":
+    threat_level = "MEDIUM"
+    status = "⚠️ DUST ALERT"
+    action = "Dust storm — auto-clean sequence triggered (25% efficiency loss)"
+    mode = "monitor"
+    shield = "READY"
+    shield_reason = "Dust levels critical"
+    hr = radiation_index(ctx["radiation"], ctx.get("hours"))
+    solar_output = round(ctx["radiation"][hr] * 0.22 * 0.75, 1)
+
+st.session_state.shield_status = shield
 ctx.update(
     {
         "sim_event": sim_event,
@@ -120,3 +141,6 @@ if ctx["cv_threat"] == "damage":
         "🚨 **Panel Damage Alert** — CV detected cracked/damaged solar panels. "
         "Schedule immediate inspection and panel replacement."
     )
+
+if st.session_state.get("auto_sim"):
+    _auto_sim_scheduler()

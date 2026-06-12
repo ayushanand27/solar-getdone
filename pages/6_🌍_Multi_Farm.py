@@ -109,6 +109,7 @@ def load_farm(farm, sim_event):
     current = data["current"]
     hourly = data["hourly"]
     radiation = [float(r or 0) for r in hourly["shortwave_radiation"]]
+    hours = hourly["time"]
 
     status, action, mode, solar_output, shield, shield_reason, threat_level = ai_decision(
         current["weathercode"],
@@ -116,6 +117,7 @@ def load_farm(farm, sim_event):
         current["precipitation"],
         radiation,
         sim_event,
+        hours,
     )
 
     h2_kg = estimate_h2_kg(radiation)

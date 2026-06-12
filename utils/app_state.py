@@ -30,6 +30,7 @@ def init_session_state():
         "city_name": "Jaipur",
         "edge_start_time": time.time(),
         "edge_decision_log": [],
+        "auto_sim": False,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -126,6 +127,7 @@ def render_sidebar():
 
     st.session_state.sim_event = sim_event
     st.session_state.cv_threat = cv_threat
+    st.session_state.auto_sim = auto_sim
 
     st.sidebar.divider()
     st.sidebar.title("⚡ Edge Node")
@@ -192,7 +194,7 @@ def setup_app():
 
     sim_event = st.session_state.get("sim_event")
     status, action, mode, solar_output, shield, shield_reason, threat_level = ai_decision(
-        wcode, wind, rain, radiation, sim_event
+        wcode, wind, rain, radiation, sim_event, hours
     )
 
     h2_kg = round(sum(r * 0.22 * 0.7 for r in radiation if r > 100) / 1000, 2)

@@ -7,6 +7,7 @@ st.set_page_config(page_title="Solar OS", layout="wide", page_icon="☀️")
 
 from utils.ai_engine import detect_anomaly
 from utils.app_state import render_edge_banner, setup_app
+from utils.weather import radiation_index
 from utils.health_score import calculate_health_score
 from utils.mqtt_client import publish_to_hivemq
 
@@ -49,7 +50,7 @@ with st.spinner("🌞 Loading Solar OS..."):
         st.caption(f"📡 HiveMQ: ❌ {msg}")
     render_edge_banner(ctx)
 
-    hr = min(datetime.now().hour, len(ctx["radiation"]) - 1)
+    hr = radiation_index(ctx["radiation"], ctx.get("hours"))
     current_radiation = ctx["radiation"][hr]
     if "radiation_history" not in st.session_state:
         st.session_state.radiation_history = []

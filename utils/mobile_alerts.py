@@ -169,7 +169,9 @@ def process_auto_alerts(ctx, config):
                 config["h2_full"],
             )
 
-        hour = datetime.now().hour
+        from utils.weather import current_hour_ist
+
+        hour = current_hour_ist()
         if hour in PEAK_HOURS and config.get("peak"):
             _auto_once(
                 f"peak_{hour}",

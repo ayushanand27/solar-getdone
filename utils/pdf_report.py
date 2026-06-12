@@ -100,7 +100,9 @@ def build_recommendations(ctx, metrics):
     elif ctx["wcode"] >= 61:
         recs.append("Rain expected — keep shields on standby and defer grid export.")
 
-    hour = datetime.now().hour
+    from utils.weather import current_hour_ist
+
+    hour = current_hour_ist()
     grid_period = ctx.get("grid_period")
     grid_price = ctx.get("grid_price")
     if grid_period == "Peak" or hour in {6, 7, 8, 9, 18, 19, 20, 21}:

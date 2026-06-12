@@ -1,4 +1,4 @@
-from datetime import datetime
+from utils.weather import current_hour_ist
 
 PEAK_HOURS = {6, 7, 8, 9, 18, 19, 20, 21}
 NORMAL_HOURS = set(range(10, 18))
@@ -17,6 +17,6 @@ def grid_price(hour):
 
 
 def current_grid_tier():
-    hour = datetime.now().hour
+    hour = current_hour_ist()
     price, period = grid_price(hour)
     return {"price": price, "period": period, "hour": hour}

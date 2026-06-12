@@ -12,7 +12,7 @@ import plotly.express as px
 from utils.ai_engine import ai_decision
 from utils.app_state import setup_app
 from utils.health_score import calculate_health_score
-from utils.weather import get_coordinates, get_weather
+from utils.weather import current_hour_ist, get_coordinates, get_weather
 
 FARMS = [
     {"id": "jaisalmer", "name": "Jaisalmer Solar Park", "city": "Jaisalmer", "region": "Rajasthan"},
@@ -60,8 +60,42 @@ def build_farms_map_df(all_farms):
     return pd.DataFrame(rows)
 
 
-def render_fleet_map(all_farms, map_style):
+def farms_to_map_locations(all_farms):
     map_df = build_farms_map_df(all_farms)
+    return tuple(
+        (
+            row["name"],
+            row["lat"],
+            row["lon"],
+            row["state"],
+            row["solar_output"],
+            row["shield"],
+            row["threat_level"],
+            row["health_score"],
+            row["health_grade"],
+            row["threat_color"],
+        )
+        for _, row in map_df.iterrows()
+    )
+
+
+@st.cache_data(ttl=600)
+def build_farm_map(farm_locations, map_style):
+    map_df = pd.DataFrame(
+        farm_locations,
+        columns=[
+            "name",
+            "lat",
+            "lon",
+            "state",
+            "solar_output",
+            "shield",
+            "threat_level",
+            "health_score",
+            "health_grade",
+            "threat_color",
+        ],
+    )
     fig = px.scatter_map(
         map_df,
         lat="lat",
@@ -82,12 +116,21 @@ def render_fleet_map(all_farms, map_style):
             "threat_color": False,
         },
         color_discrete_map=THREAT_MAP_COLORS,
-        zoom=4.2,
+        zoom=3.5,
         center={"lat": 20.5, "lon": 78.0},
         map_style=map_style,
     )
-    fig.update_layout(margin={"r": 0, "t": 40, "l": 0, "b": 0}, height=480)
-    st.plotly_chart(fig, use_container_width=True)
+    fig.update_layout(margin={"r": 0, "t": 40, "l": 0, "b": 0}, height=400)
+    return fig
+
+
+def render_fleet_map(all_farms, map_style):
+    if st.session_state.get("last_map_style") != map_style:
+        st.session_state.last_map_style = map_style
+    farm_locations = farms_to_map_locations(all_farms)
+    with st.spinner("Loading farm map..."):
+        fig = build_farm_map(farm_locations, map_style)
+        st.plotly_chart(fig, use_container_width=True)
 
 
 def shield_display(shield):
@@ -236,28 +279,41 @@ def render_farm_detail(farm_data, ctx):
         st.caption(f"Lat {farm_data['lat']:.2f} | Lon {farm_data['lon']:.2f}")
 
     st.markdown("#### ☀️ Hourly Radiation Forecast")
-    detail_df = pd.DataFrame(
-        {
-            "Hour": [t[11:16] for t in farm_data["hours"]],
-            "Radiation (W/m²)": [float(r or 0) for r in farm_data["radiation"]],
-        }
-    )
-    detail_df["Est. Output (W/m²)"] = (detail_df["Radiation (W/m²)"] * 0.22).round(1)
-    if ctx["sim_event"] == "dust":
-        detail_df["Est. Output (W/m²)"] = (detail_df["Est. Output (W/m²)"] * 0.75).round(1)
-        st.caption("⚠️ Dust storm active — showing 25% efficiency loss")
-    hour_order = detail_df["Hour"].tolist()
-    radiation_chart = (
-        alt.Chart(detail_df)
-        .mark_line(point=True, color="#F7B731")
-        .encode(
-            x=alt.X("Hour:N", sort=hour_order, title="Hour"),
-            y=alt.Y("Est. Output (W/m²):Q", title="Est. Output (W/m²)", scale=alt.Scale(zero=True)),
-            tooltip=["Hour", "Radiation (W/m²)", "Est. Output (W/m²)"],
+    radiation_vals = [float(r or 0) for r in farm_data.get("radiation", [0])]
+    max_rad = max(radiation_vals) if radiation_vals else 0
+    hour_ist = current_hour_ist()
+    mostly_zeros = max_rad == 0 or sum(1 for r in radiation_vals if r > 10) <= 2
+
+    if max_rad > 10:
+        detail_df = pd.DataFrame(
+            {
+                "Hour": [t[11:16] for t in farm_data["hours"]],
+                "Radiation (W/m²)": radiation_vals,
+            }
         )
-        .properties(height=280)
-    )
-    st.altair_chart(radiation_chart, use_container_width=True)
+        detail_df["Est. Output (W/m²)"] = (detail_df["Radiation (W/m²)"] * 0.22).round(1)
+        if ctx["sim_event"] == "dust":
+            detail_df["Est. Output (W/m²)"] = (detail_df["Est. Output (W/m²)"] * 0.75).round(1)
+            st.caption("⚠️ Dust storm active — showing 25% efficiency loss")
+        hour_order = detail_df["Hour"].tolist()
+        radiation_chart = (
+            alt.Chart(detail_df)
+            .mark_line(point=True, color="#F7B731")
+            .encode(
+                x=alt.X("Hour:N", sort=hour_order, title="Hour"),
+                y=alt.Y("Est. Output (W/m²):Q", title="Est. Output (W/m²)", scale=alt.Scale(zero=True)),
+                tooltip=["Hour", "Radiation (W/m²)", "Est. Output (W/m²)"],
+            )
+            .properties(height=280)
+        )
+        st.altair_chart(radiation_chart, use_container_width=True)
+    elif mostly_zeros or not (6 <= hour_ist < 18):
+        st.info(
+            "Solar radiation data unavailable for current time period. "
+            "Check back during daylight hours (6am-6pm IST)."
+        )
+    else:
+        st.info("No significant solar radiation detected currently.")
 
     st.markdown("#### 🤖 24hr AI Decision Log")
     st.dataframe(

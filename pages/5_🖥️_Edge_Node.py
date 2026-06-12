@@ -164,17 +164,17 @@ if st.button("🔔 Test Alert", use_container_width=False):
             )
             if success:
                 st.session_state.last_email_status = f"✅ Email sent to {to_email}"
-                st.success(f"✅ Email sent to {to_email}")
             else:
                 st.session_state.last_email_status = f"❌ Email failed: {msg}"
-                st.error(f"❌ Email failed: {msg}")
         else:
-            st.info("Email alerts disabled — toggle on to send")
+            st.session_state.last_email_status = "ℹ️ Email alerts disabled — toggle on to send"
 
 if st.session_state.get("last_email_status"):
     status_msg = st.session_state.last_email_status
     if status_msg.startswith("✅"):
         st.success(status_msg)
+    elif status_msg.startswith("ℹ️"):
+        st.info(status_msg)
     else:
         st.error(status_msg)
 

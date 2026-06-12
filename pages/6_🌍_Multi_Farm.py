@@ -12,7 +12,7 @@ import plotly.express as px
 from utils.ai_engine import ai_decision
 from utils.app_state import setup_app
 from utils.health_score import calculate_health_score
-from utils.weather import current_hour_ist, get_coordinates, get_weather
+from utils.weather import get_coordinates, get_weather
 
 FARMS = [
     {"id": "jaisalmer", "name": "Jaisalmer Solar Park", "city": "Jaisalmer", "region": "Rajasthan"},
@@ -139,6 +139,29 @@ def shield_display(shield):
 
 def estimate_h2_kg(radiation):
     return round(sum(r * 0.22 * 0.7 for r in radiation if r > 100) / 1000, 2)
+
+
+def build_radiation_chart(hours, radiation, sim_event=None):
+    chart_df = pd.DataFrame(
+        {
+            "Hour": [t[11:16] for t in hours],
+            "Radiation (W/m²)": [float(r or 0) for r in radiation],
+        }
+    )
+    chart_df["Estimated Output (W/m²)"] = (chart_df["Radiation (W/m²)"] * 0.22).round(1)
+    if sim_event == "dust":
+        chart_df["Estimated Output (W/m²)"] = (chart_df["Estimated Output (W/m²)"] * 0.75).round(1)
+    hour_order = chart_df["Hour"].tolist()
+    return (
+        alt.Chart(chart_df)
+        .mark_line(point=True, color="#F7B731")
+        .encode(
+            x=alt.X("Hour:N", sort=hour_order, title="Hour"),
+            y=alt.Y("Estimated Output (W/m²):Q", title="Estimated Output (W/m²)", scale=alt.Scale(zero=True)),
+            tooltip=["Hour", "Radiation (W/m²)", "Estimated Output (W/m²)"],
+        )
+        .properties(height=280)
+    )
 
 
 @st.cache_data(ttl=300)
@@ -279,41 +302,17 @@ def render_farm_detail(farm_data, ctx):
         st.caption(f"Lat {farm_data['lat']:.2f} | Lon {farm_data['lon']:.2f}")
 
     st.markdown("#### ☀️ Hourly Radiation Forecast")
-    radiation_vals = [float(r or 0) for r in farm_data.get("radiation", [0])]
-    max_rad = max(radiation_vals) if radiation_vals else 0
-    hour_ist = current_hour_ist()
-    mostly_zeros = max_rad == 0 or sum(1 for r in radiation_vals if r > 10) <= 2
-
-    if max_rad > 10:
-        detail_df = pd.DataFrame(
-            {
-                "Hour": [t[11:16] for t in farm_data["hours"]],
-                "Radiation (W/m²)": radiation_vals,
-            }
-        )
-        detail_df["Est. Output (W/m²)"] = (detail_df["Radiation (W/m²)"] * 0.22).round(1)
+    hours = farm_data.get("hours", [])
+    radiation_vals = farm_data.get("radiation", [])
+    if hours and radiation_vals:
         if ctx["sim_event"] == "dust":
-            detail_df["Est. Output (W/m²)"] = (detail_df["Est. Output (W/m²)"] * 0.75).round(1)
             st.caption("⚠️ Dust storm active — showing 25% efficiency loss")
-        hour_order = detail_df["Hour"].tolist()
-        radiation_chart = (
-            alt.Chart(detail_df)
-            .mark_line(point=True, color="#F7B731")
-            .encode(
-                x=alt.X("Hour:N", sort=hour_order, title="Hour"),
-                y=alt.Y("Est. Output (W/m²):Q", title="Est. Output (W/m²)", scale=alt.Scale(zero=True)),
-                tooltip=["Hour", "Radiation (W/m²)", "Est. Output (W/m²)"],
-            )
-            .properties(height=280)
-        )
-        st.altair_chart(radiation_chart, use_container_width=True)
-    elif mostly_zeros or not (6 <= hour_ist < 18):
-        st.info(
-            "Solar radiation data unavailable for current time period. "
-            "Check back during daylight hours (6am-6pm IST)."
+        st.altair_chart(
+            build_radiation_chart(hours, radiation_vals, ctx["sim_event"]),
+            use_container_width=True,
         )
     else:
-        st.info("No significant solar radiation detected currently.")
+        st.warning("Radiation forecast data is loading — try refreshing the page.")
 
     st.markdown("#### 🤖 24hr AI Decision Log")
     st.dataframe(

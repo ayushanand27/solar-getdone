@@ -97,6 +97,45 @@ def ai_decision(wcode, wind, rain, radiation, sim_event, hours=None):
     )
 
 
+def apply_sim_overrides(
+    sim_event,
+    status,
+    action,
+    mode,
+    solar_output,
+    shield,
+    shield_reason,
+    threat_level,
+    radiation=None,
+    hours=None,
+):
+    """Force bird/dust simulator state onto the decision (weather closures still win in ai_decision)."""
+    if sim_event == "bird":
+        return (
+            "🛡️ SHIELD PARTIAL",
+            "Bird activity — deterrent active, partial shield",
+            "monitor",
+            solar_output,
+            "READY",
+            "Bird swarm detected by camera",
+            "MEDIUM",
+        )
+    if sim_event == "dust":
+        hr = radiation_index(radiation or [], hours)
+        rad = (radiation or [0])[hr] if radiation else 0
+        dust_output = round(rad * 0.22 * 0.75, 1)
+        return (
+            "⚠️ DUST ALERT",
+            "Dust storm — auto-clean sequence triggered (25% efficiency loss)",
+            "monitor",
+            dust_output,
+            "READY",
+            "Dust levels critical",
+            "MEDIUM",
+        )
+    return status, action, mode, solar_output, shield, shield_reason, threat_level
+
+
 def detect_anomaly(radiation_history: list) -> dict:
     if len(radiation_history) < 2:
         return {"anomaly": False}

@@ -5,7 +5,7 @@ from datetime import datetime
 import streamlit as st
 from PIL import Image
 
-from utils.ai_engine import ai_decision
+from utils.ai_engine import ai_decision, apply_sim_overrides
 from utils.auth import check_auth
 from utils.cv_module import SAMPLE_IMAGES, SAMPLES_DIR, run_cv_detection
 from utils.grid_pricing import current_grid_tier
@@ -13,9 +13,22 @@ from utils.health_score import calculate_health_score
 from utils.weather import get_7day, get_coordinates, get_weather
 
 
+AUTO_SIM_POOL = [None, None, None, "bird", "dust", "bird", "dust"]
+
+
+def _pick_auto_sim_event():
+    cycle = int(time.time()) // 5
+    if st.session_state.get("auto_sim_cycle") != cycle:
+        st.session_state.auto_sim_cycle = cycle
+        random.seed(cycle)
+        st.session_state.sim_event = random.choice(AUTO_SIM_POOL)
+    return st.session_state.get("sim_event")
+
+
 @st.fragment(run_every=5)
 def _auto_sim_scheduler():
     if st.session_state.get("auto_sim_toggle"):
+        _pick_auto_sim_event()
         st.rerun()
 
 
@@ -54,8 +67,7 @@ def render_sidebar():
     )
 
     if auto_sim:
-        random.seed(int(time.time()) // 5)
-        sim_event = random.choice([None, None, None, "bird", "dust", "bird", "dust"])
+        sim_event = _pick_auto_sim_event()
     elif bird_active:
         sim_event = "bird"
     elif dust_active:
@@ -196,6 +208,19 @@ def setup_app():
     status, action, mode, solar_output, shield, shield_reason, threat_level = ai_decision(
         wcode, wind, rain, radiation, sim_event, hours
     )
+    if sim_event in ("bird", "dust") and shield != "CLOSED":
+        status, action, mode, solar_output, shield, shield_reason, threat_level = apply_sim_overrides(
+            sim_event,
+            status,
+            action,
+            mode,
+            solar_output,
+            shield,
+            shield_reason,
+            threat_level,
+            radiation,
+            hours,
+        )
 
     h2_kg = round(sum(r * 0.22 * 0.7 for r in radiation if r > 100) / 1000, 2)
     battery_level = min(100, int(solar_output / 2))

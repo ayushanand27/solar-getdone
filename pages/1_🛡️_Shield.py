@@ -2,42 +2,39 @@ import streamlit as st
 
 st.set_page_config(page_title="Solar OS", layout="wide", page_icon="☀️")
 
-from utils.ai_engine import ai_decision
-from utils.app_state import _auto_sim_scheduler, setup_app
-from utils.weather import radiation_index
+from utils.ai_engine import apply_sim_overrides
+from utils.app_state import setup_app
 
 ctx = setup_app()
 
-sim_event = st.session_state.get("sim_event")
+sim_event = ctx["sim_event"]
 if ctx.get("cv_threat") in ("bird", "dust"):
     sim_event = ctx["cv_threat"]
     st.session_state.sim_event = sim_event
 
-status, action, mode, solar_output, shield, shield_reason, threat_level = ai_decision(
-    ctx["wcode"],
-    ctx["wind"],
-    ctx["rain"],
-    ctx["radiation"],
-    sim_event,
-    ctx.get("hours"),
-)
-
-if sim_event == "bird":
-    shield = "READY"
-    threat_level = "MEDIUM"
-    status = "🛡️ SHIELD PARTIAL"
-    action = "Bird activity — deterrent active, partial shield"
-    mode = "monitor"
-    shield_reason = "Bird swarm detected by camera"
-elif sim_event == "dust":
-    threat_level = "MEDIUM"
-    status = "⚠️ DUST ALERT"
-    action = "Dust storm — auto-clean sequence triggered (25% efficiency loss)"
-    mode = "monitor"
-    shield = "READY"
-    shield_reason = "Dust levels critical"
-    hr = radiation_index(ctx["radiation"], ctx.get("hours"))
-    solar_output = round(ctx["radiation"][hr] * 0.22 * 0.75, 1)
+if ctx["shield"] != "CLOSED":
+    status, action, mode, solar_output, shield, shield_reason, threat_level = apply_sim_overrides(
+        sim_event,
+        ctx["status"],
+        ctx["action"],
+        ctx["mode"],
+        ctx["solar_output"],
+        ctx["shield"],
+        ctx["shield_reason"],
+        ctx["threat_level"],
+        ctx["radiation"],
+        ctx.get("hours"),
+    )
+else:
+    status, action, mode, solar_output, shield, shield_reason, threat_level = (
+        ctx["status"],
+        ctx["action"],
+        ctx["mode"],
+        ctx["solar_output"],
+        ctx["shield"],
+        ctx["shield_reason"],
+        ctx["threat_level"],
+    )
 
 st.session_state.shield_status = shield
 ctx.update(
@@ -55,6 +52,13 @@ ctx.update(
 
 st.title("🛡️ Shield Protection")
 st.caption(f"Autonomous panel protection | 📍 {ctx['city_name']}")
+
+if ctx.get("auto_sim"):
+    cycle_labels = {None: "✅ Clear skies", "bird": "🐦 Bird attack", "dust": "🌫️ Dust storm"}
+    st.info(
+        f"⚡ **Auto simulation active** — current cycle: **{cycle_labels.get(sim_event, sim_event)}** "
+        "(refreshes every 5 seconds)"
+    )
 
 if sim_event == "bird":
     st.warning("🐦 **Bird threat active** — shield on standby with partial closure.")
@@ -141,6 +145,3 @@ if ctx["cv_threat"] == "damage":
         "🚨 **Panel Damage Alert** — CV detected cracked/damaged solar panels. "
         "Schedule immediate inspection and panel replacement."
     )
-
-if st.session_state.get("auto_sim"):
-    _auto_sim_scheduler()

@@ -15,6 +15,15 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+from utils.pdf_text import (
+    PDF_FONT,
+    PDF_FONT_BOLD,
+    clean_pdf_text,
+    pdf_cell,
+    pdf_paragraph,
+    register_unicode_font,
+)
+
 # Brand palette
 SOLAR_YELLOW = colors.HexColor("#F7B731")
 DARK_BG = colors.HexColor("#0D1117")
@@ -129,11 +138,12 @@ def build_recommendations(ctx, metrics):
 
 
 def _build_styles():
+    register_unicode_font()
     base = getSampleStyleSheet()
     base.add(
         ParagraphStyle(
             name="CoverReportTitle",
-            fontName="Helvetica-Bold",
+            fontName=PDF_FONT_BOLD,
             fontSize=22,
             leading=26,
             textColor=TEXT_DARK,
@@ -144,7 +154,7 @@ def _build_styles():
     base.add(
         ParagraphStyle(
             name="CoverFooter",
-            fontName="Helvetica-Oblique",
+            fontName=PDF_FONT,
             fontSize=10,
             leading=14,
             textColor=colors.HexColor("#666666"),
@@ -154,7 +164,7 @@ def _build_styles():
     base.add(
         ParagraphStyle(
             name="SectionHeader",
-            fontName="Helvetica-Bold",
+            fontName=PDF_FONT_BOLD,
             fontSize=16,
             leading=20,
             textColor=TEXT_DARK,
@@ -166,7 +176,7 @@ def _build_styles():
     base.add(
         ParagraphStyle(
             name="CardValue",
-            fontName="Helvetica-Bold",
+            fontName=PDF_FONT_BOLD,
             fontSize=18,
             leading=22,
             textColor=WHITE,
@@ -176,7 +186,7 @@ def _build_styles():
     base.add(
         ParagraphStyle(
             name="CardLabel",
-            fontName="Helvetica",
+            fontName=PDF_FONT,
             fontSize=9,
             leading=12,
             textColor=WHITE,
@@ -186,7 +196,7 @@ def _build_styles():
     base.add(
         ParagraphStyle(
             name="CardIcon",
-            fontName="Helvetica",
+            fontName=PDF_FONT,
             fontSize=14,
             leading=16,
             textColor=WHITE,
@@ -196,7 +206,7 @@ def _build_styles():
     base.add(
         ParagraphStyle(
             name="BadgeText",
-            fontName="Helvetica-Bold",
+            fontName=PDF_FONT_BOLD,
             fontSize=11,
             leading=14,
             textColor=WHITE,
@@ -206,7 +216,7 @@ def _build_styles():
     base.add(
         ParagraphStyle(
             name="HighlightBox",
-            fontName="Helvetica",
+            fontName=PDF_FONT,
             fontSize=11,
             leading=15,
             textColor=TEXT_DARK,
@@ -215,7 +225,7 @@ def _build_styles():
     base.add(
         ParagraphStyle(
             name="RecNumber",
-            fontName="Helvetica-Bold",
+            fontName=PDF_FONT_BOLD,
             fontSize=14,
             leading=18,
             textColor=SOLAR_YELLOW,
@@ -224,7 +234,7 @@ def _build_styles():
     base.add(
         ParagraphStyle(
             name="RecBody",
-            fontName="Helvetica",
+            fontName=PDF_FONT,
             fontSize=11,
             leading=15,
             textColor=TEXT_DARK,
@@ -233,7 +243,7 @@ def _build_styles():
     base.add(
         ParagraphStyle(
             name="EnergyValueGreen",
-            fontName="Helvetica-Bold",
+            fontName=PDF_FONT_BOLD,
             fontSize=16,
             leading=20,
             textColor=GREEN,
@@ -243,7 +253,7 @@ def _build_styles():
     base.add(
         ParagraphStyle(
             name="EnergyValueYellow",
-            fontName="Helvetica-Bold",
+            fontName=PDF_FONT_BOLD,
             fontSize=16,
             leading=20,
             textColor=SOLAR_YELLOW,
@@ -253,7 +263,7 @@ def _build_styles():
     base.add(
         ParagraphStyle(
             name="EnergyLabel",
-            fontName="Helvetica",
+            fontName=PDF_FONT,
             fontSize=9,
             leading=12,
             textColor=TEXT_DARK,
@@ -264,19 +274,20 @@ def _build_styles():
 
 
 def _draw_cover_header(canvas, doc):
+    register_unicode_font()
     canvas.saveState()
     page_w, page_h = A4
     canvas.setFillColor(SOLAR_YELLOW)
     canvas.rect(0, page_h - 2 * inch, page_w, 2 * inch, fill=1, stroke=0)
     canvas.setFillColor(WHITE)
-    canvas.setFont("Helvetica-Bold", 30)
-    canvas.drawCentredString(page_w / 2, page_h - 1.2 * inch, "☀ SOLAR OS")
+    canvas.setFont(PDF_FONT_BOLD, 30)
+    canvas.drawCentredString(page_w / 2, page_h - 1.2 * inch, clean_pdf_text("[Solar] SOLAR OS"))
     canvas.restoreState()
 
 
 def _section_header(title, styles):
     bar = Table(
-        [[None, Paragraph(title, styles["SectionHeader"])]],
+        [[None, pdf_paragraph(title, styles["SectionHeader"])]],
         colWidths=[0.12 * inch, 6.3 * inch],
     )
     bar.setStyle(
@@ -297,9 +308,9 @@ def _section_header(title, styles):
 def _metric_card(icon, value, label, bg_color, styles):
     card = Table(
         [
-            [Paragraph(icon, styles["CardIcon"])],
-            [Paragraph(value, styles["CardValue"])],
-            [Paragraph(label, styles["CardLabel"])],
+            [pdf_paragraph(icon, styles["CardIcon"])],
+            [pdf_paragraph(value, styles["CardValue"])],
+            [pdf_paragraph(label, styles["CardLabel"])],
         ],
         colWidths=[2.95 * inch],
     )
@@ -319,7 +330,7 @@ def _metric_card(icon, value, label, bg_color, styles):
 
 
 def _status_badge(text, bg_color, styles):
-    badge = Table([[Paragraph(text, styles["BadgeText"])]], colWidths=[2.8 * inch])
+    badge = Table([[pdf_paragraph(text, styles["BadgeText"])]], colWidths=[2.8 * inch])
     badge.setStyle(
         TableStyle(
             [
@@ -353,9 +364,9 @@ def _threat_badge_color(threat_level):
 def _energy_card(icon, value, label, value_style, styles):
     card = Table(
         [
-            [Paragraph(icon, styles["EnergyLabel"])],
-            [Paragraph(value, value_style)],
-            [Paragraph(label, styles["EnergyLabel"])],
+            [pdf_paragraph(icon, styles["EnergyLabel"])],
+            [pdf_paragraph(value, value_style)],
+            [pdf_paragraph(label, styles["EnergyLabel"])],
         ],
         colWidths=[1.95 * inch],
     )
@@ -376,7 +387,7 @@ def _energy_card(icon, value, label, value_style, styles):
 
 def _recommendation_card(number, text, styles):
     content = Table(
-        [[Paragraph(str(number), styles["RecNumber"]), Paragraph(text, styles["RecBody"])]],
+        [[pdf_paragraph(str(number), styles["RecNumber"]), pdf_paragraph(text, styles["RecBody"])]],
         colWidths=[0.35 * inch, 5.9 * inch],
     )
     content.setStyle(
@@ -405,6 +416,7 @@ def _recommendation_card(number, text, styles):
 
 
 def generate_farm_report(ctx, metrics, forecast_rows, recommendations, report_date, report_time):
+    register_unicode_font()
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -420,12 +432,12 @@ def generate_farm_report(ctx, metrics, forecast_rows, recommendations, report_da
 
     # Page 1 — Cover
     story.append(Spacer(1, 1.85 * inch))
-    story.append(Paragraph("Farm Intelligence Report", styles["CoverReportTitle"]))
+    story.append(pdf_paragraph("Farm Intelligence Report", styles["CoverReportTitle"]))
     info_box = Table(
         [
-            ["Location", ctx["city_name"]],
-            ["Date", report_date],
-            ["Time", report_time],
+            [pdf_cell("Location"), pdf_cell(ctx["city_name"])],
+            [pdf_cell("Date"), pdf_cell(report_date)],
+            [pdf_cell("Time"), pdf_cell(report_time)],
         ],
         colWidths=[1.2 * inch, 4.5 * inch],
     )
@@ -435,8 +447,8 @@ def generate_farm_report(ctx, metrics, forecast_rows, recommendations, report_da
                 ("BACKGROUND", (0, 0), (0, -1), DARK_BG),
                 ("TEXTCOLOR", (0, 0), (0, -1), WHITE),
                 ("TEXTCOLOR", (1, 0), (1, -1), TEXT_DARK),
-                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-                ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
+                ("FONTNAME", (0, 0), (0, -1), PDF_FONT_BOLD),
+                ("FONTNAME", (1, 0), (1, -1), PDF_FONT),
                 ("FONTSIZE", (0, 0), (-1, -1), 11),
                 ("BOX", (0, 0), (-1, -1), 1.5, SOLAR_YELLOW),
                 ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#333333")),
@@ -449,7 +461,7 @@ def generate_farm_report(ctx, metrics, forecast_rows, recommendations, report_da
     story.append(info_box)
     story.append(Spacer(1, 2.4 * inch))
     story.append(
-        Paragraph("Powered by Edge AI | Generated by Solar OS v1.0", styles["CoverFooter"])
+        pdf_paragraph("Powered by Edge AI | Generated by Solar OS v1.0", styles["CoverFooter"])
     )
     story.append(PageBreak())
 
@@ -484,12 +496,12 @@ def generate_farm_report(ctx, metrics, forecast_rows, recommendations, report_da
     badge_row = Table(
         [
             [
-                Paragraph("<b>Shield Status</b>", styles["HighlightBox"]),
-                Paragraph("<b>Threat Level</b>", styles["HighlightBox"]),
+                pdf_paragraph("<b>Shield Status</b>", styles["HighlightBox"]),
+                pdf_paragraph("<b>Threat Level</b>", styles["HighlightBox"]),
             ],
             [
-                _status_badge(shield_label, _shield_badge(ctx["shield"]), styles),
-                _status_badge(ctx["threat_level"], _threat_badge_color(ctx["threat_level"]), styles),
+                _status_badge(pdf_cell(shield_label), _shield_badge(ctx["shield"]), styles),
+                _status_badge(pdf_cell(ctx["threat_level"]), _threat_badge_color(ctx["threat_level"]), styles),
             ],
         ],
         colWidths=[3.05 * inch, 3.05 * inch],
@@ -500,8 +512,8 @@ def generate_farm_report(ctx, metrics, forecast_rows, recommendations, report_da
 
     decision_box = Table(
         [
-            [Paragraph(f"<b>Energy Mode:</b> {ctx['mode'].title()}", styles["HighlightBox"])],
-            [Paragraph(f"<b>AI Decision:</b> {ctx['status']} — {ctx['action']}", styles["HighlightBox"])],
+            [pdf_paragraph(f"<b>Energy Mode:</b> {ctx['mode'].title()}", styles["HighlightBox"])],
+            [pdf_paragraph(f"<b>AI Decision:</b> {ctx['status']} - {ctx['action']}", styles["HighlightBox"])],
         ],
         colWidths=[6.2 * inch],
     )
@@ -549,7 +561,7 @@ def generate_farm_report(ctx, metrics, forecast_rows, recommendations, report_da
     story.append(energy_row2)
     story.append(Spacer(1, 0.2 * inch))
     story.append(
-        Paragraph(
+        pdf_paragraph(
             f"<b>Farm Size:</b> {metrics['farm_size']} kW  |  "
             f"<b>Electricity Rate:</b> Rs. {metrics['electricity_rate']}/kWh",
             styles["HighlightBox"],
@@ -559,11 +571,25 @@ def generate_farm_report(ctx, metrics, forecast_rows, recommendations, report_da
 
     # Page 4 — 7-Day Forecast
     story.append(_section_header("7-Day Forecast Summary", styles))
-    forecast_table_data = [["Date", "Est Output", "Rain (mm)", "AI Plan", "Status"]]
+    forecast_table_data = [
+        [
+            pdf_cell("Date"),
+            pdf_cell("Est Output"),
+            pdf_cell("Rain (mm)"),
+            pdf_cell("AI Plan"),
+            pdf_cell("Status"),
+        ]
+    ]
     row_styles = []
     for row in forecast_rows:
         forecast_table_data.append(
-            [row["Date"], str(row["Est Output"]), str(row["Rain"]), row["AI Plan"], row["Status"]]
+            [
+                pdf_cell(row["Date"]),
+                pdf_cell(row["Est Output"]),
+                pdf_cell(row["Rain"]),
+                pdf_cell(row["AI Plan"]),
+                pdf_cell(row["Status"]),
+            ]
         )
         row_styles.append(row.get("row_type", "neutral"))
 
@@ -574,8 +600,8 @@ def generate_farm_report(ctx, metrics, forecast_rows, recommendations, report_da
     table_cmds = [
         ("BACKGROUND", (0, 0), (-1, 0), SOLAR_YELLOW),
         ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("FONTNAME", (0, 0), (-1, 0), PDF_FONT_BOLD),
+        ("FONTNAME", (0, 1), (-1, -1), PDF_FONT),
         ("FONTSIZE", (0, 0), (-1, -1), 8),
         ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
         ("TOPPADDING", (0, 0), (-1, -1), 7),

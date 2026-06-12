@@ -7,7 +7,15 @@ from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle
+
+from utils.pdf_text import (
+    PDF_FONT,
+    PDF_FONT_BOLD,
+    pdf_cell,
+    pdf_paragraph,
+    register_unicode_font,
+)
 
 INDIA_CREDIT_PRICE_INR = 1500
 VCM_CREDIT_PRICE_USD = 7
@@ -167,69 +175,74 @@ def build_comparison_table(farm_size_kw, metrics):
 
 
 def generate_esg_pdf(farm_name, metrics, esg, projection_df, comparison_df, report_date):
+    register_unicode_font()
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=50)
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle("Title", parent=styles["Heading1"], alignment=TA_CENTER, textColor=DARK, fontSize=20)
-    sub_style = ParagraphStyle("Sub", parent=styles["Normal"], alignment=TA_CENTER, textColor=GREY, fontSize=11)
-    body = ParagraphStyle("Body", parent=styles["Normal"], fontSize=10, leading=14)
+    title_style = ParagraphStyle(
+        "Title", parent=styles["Heading1"], alignment=TA_CENTER, textColor=DARK, fontSize=20, fontName=PDF_FONT_BOLD
+    )
+    sub_style = ParagraphStyle(
+        "Sub", parent=styles["Normal"], alignment=TA_CENTER, textColor=GREY, fontSize=11, fontName=PDF_FONT
+    )
+    body = ParagraphStyle("Body", parent=styles["Normal"], fontSize=10, leading=14, fontName=PDF_FONT)
 
     story = [
-        Paragraph("ESG &amp; Carbon Credit Report", title_style),
+        pdf_paragraph("ESG &amp; Carbon Credit Report", title_style),
         Spacer(1, 0.15 * inch),
-        Paragraph(f"Farm: <b>{farm_name}</b>", sub_style),
-        Paragraph(f"Date: {report_date}", sub_style),
-        Paragraph("India Carbon Credit Market 2026", sub_style),
+        pdf_paragraph(f"Farm: <b>{farm_name}</b>", sub_style),
+        pdf_paragraph(f"Date: {report_date}", sub_style),
+        pdf_paragraph("India Carbon Credit Market 2026", sub_style),
         Spacer(1, 0.3 * inch),
-        Paragraph("<b>Carbon Metrics</b>", body),
+        pdf_paragraph("<b>Carbon Metrics</b>", body),
         Spacer(1, 0.1 * inch),
-        Paragraph(
+        pdf_paragraph(
             f"Annual Energy: {metrics['annual_energy_kwh']:,.0f} kWh<br/>"
-            f"Annual CO₂ Avoided: {metrics['co2_avoided_tonnes']:,.2f} tonnes<br/>"
+            f"Annual CO2 Avoided: {metrics['co2_avoided_tonnes']:,.2f} tonnes<br/>"
             f"Carbon Credits Generated: {metrics['carbon_credits']:,.2f} credits<br/>"
-            f"India CCTS Revenue: ₹{metrics['india_revenue_inr']:,.0f}/year<br/>"
+            f"India CCTS Revenue: Rs.{metrics['india_revenue_inr']:,.0f}/year<br/>"
             f"International VCM Revenue: ${metrics['vcm_revenue_usd']:,.0f}/year",
             body,
         ),
         Spacer(1, 0.25 * inch),
-        Paragraph("<b>25-Year Projection Summary</b>", body),
+        pdf_paragraph("<b>25-Year Projection Summary</b>", body),
         Spacer(1, 0.1 * inch),
     ]
 
     final_row = projection_df.iloc[-1]
     story.append(
-        Paragraph(
-            f"Cumulative CO₂ avoided: {final_row['Cumulative CO₂ (tonnes)']:,.1f} tonnes<br/>"
-            f"Cumulative credit revenue: ₹{final_row['Cumulative Credit Revenue (₹)']:,.0f}<br/>"
-            f"Cumulative fossil savings: ₹{final_row['Cumulative Fossil Savings (₹)']:,.0f}",
+        pdf_paragraph(
+            f"Cumulative CO2 avoided: {final_row['Cumulative CO₂ (tonnes)']:,.1f} tonnes<br/>"
+            f"Cumulative credit revenue: Rs.{final_row['Cumulative Credit Revenue (₹)']:,.0f}<br/>"
+            f"Cumulative fossil savings: Rs.{final_row['Cumulative Fossil Savings (₹)']:,.0f}",
             body,
         )
     )
     story.append(Spacer(1, 0.25 * inch))
-    story.append(Paragraph("<b>ESG Scores</b>", body))
+    story.append(pdf_paragraph("<b>ESG Scores</b>", body))
     story.append(Spacer(1, 0.1 * inch))
     story.append(
-        Paragraph(
-            f"Environment: {esg['environment']}/100 · "
-            f"Social: {esg['social']}/100 · "
+        pdf_paragraph(
+            f"Environment: {esg['environment']}/100 | "
+            f"Social: {esg['social']}/100 | "
             f"Governance: {esg['governance']}/100<br/>"
-            f"Overall ESG: {esg['overall']}/100 — {esg['grade']}",
+            f"Overall ESG: {esg['overall']}/100 - {esg['grade']}",
             body,
         )
     )
     story.append(Spacer(1, 0.25 * inch))
-    story.append(Paragraph("<b>Source Comparison</b>", body))
+    story.append(pdf_paragraph("<b>Source Comparison</b>", body))
     story.append(Spacer(1, 0.1 * inch))
 
-    comp_rows = [["Source", "CO₂/year (t)", "Water/year (ML)", "Cost/year (₹)", "Credits"]]
+    comp_rows = [[pdf_cell("Source"), pdf_cell("CO2/year (t)"), pdf_cell("Water/year (ML)"), pdf_cell("Cost/year (Rs.)"), pdf_cell("Credits")]]
     for _, row in comparison_df.iterrows():
         comp_rows.append(
             [
-                row["Source"],
-                str(row["CO₂/year (tonnes)"]),
-                str(row["Water/year (ML)"]),
-                str(row["Energy Cost/year (₹)"]),
-                str(row["Carbon Credits/year"]),
+                pdf_cell(row["Source"]),
+                pdf_cell(row["CO₂/year (tonnes)"]),
+                pdf_cell(row["Water/year (ML)"]),
+                pdf_cell(row["Energy Cost/year (₹)"]),
+                pdf_cell(row["Carbon Credits/year"]),
             ]
         )
     table = Table(comp_rows, colWidths=[1.6 * inch, 0.9 * inch, 1.0 * inch, 1.1 * inch, 0.8 * inch])
@@ -238,7 +251,8 @@ def generate_esg_pdf(farm_name, metrics, esg, projection_df, comparison_df, repo
             [
                 ("BACKGROUND", (0, 0), (-1, 0), DARK),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTNAME", (0, 0), (-1, 0), PDF_FONT_BOLD),
+                ("FONTNAME", (0, 1), (-1, -1), PDF_FONT),
                 ("FONTSIZE", (0, 0), (-1, -1), 8),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
             ]
@@ -246,7 +260,7 @@ def generate_esg_pdf(farm_name, metrics, esg, projection_df, comparison_df, repo
     )
     story.append(table)
     story.append(Spacer(1, 0.4 * inch))
-    story.append(Paragraph("<i>Generated by Solar OS — Carbon Credits &amp; ESG Module</i>", sub_style))
+    story.append(pdf_paragraph("<i>Generated by Solar OS - Carbon Credits &amp; ESG Module</i>", sub_style))
 
     doc.build(story)
     return buffer.getvalue()

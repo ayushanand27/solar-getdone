@@ -2,6 +2,8 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
+from utils.pdf_text import clean_pdf_text
+
 
 def _clamp(score):
     return max(0, min(100, round(score)))

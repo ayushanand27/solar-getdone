@@ -10,24 +10,14 @@ import pandas as pd
 
 from utils.app_state import setup_app
 
-PEAK_HOURS = {6, 7, 8, 9, 18, 19, 20, 21}
-NORMAL_HOURS = set(range(10, 18))
-OFF_PEAK_PRICE = 3
-NORMAL_PRICE = 7
-PEAK_PRICE = 12
-FLAT_RATE = 7
+from utils.grid_pricing import (
+    FLAT_RATE,
+    grid_price,
+)
 
 
 def hour_from_time(time_str):
     return int(time_str[11:13])
-
-
-def grid_price(hour):
-    if hour in PEAK_HOURS:
-        return PEAK_PRICE, "Peak"
-    if hour in NORMAL_HOURS:
-        return NORMAL_PRICE, "Normal"
-    return OFF_PEAK_PRICE, "Off-Peak"
 
 
 def solar_forecast_wm2(radiation, sim_event):
@@ -125,7 +115,7 @@ st.caption(f"AI-driven grid export timing | 📍 {ctx['city_name']}")
 
 current_hour = datetime.now().hour
 current_price, current_period = grid_price(current_hour)
-battery_level = min(100, int(ctx["solar_output"] / 2))
+battery_level = ctx.get("battery_level", st.session_state.get("battery_level", min(100, int(ctx["solar_output"] / 2))))
 current_action, _, _ = recommend_action(current_hour, ctx["solar_output"], battery_level)
 stability_score = grid_stability_score(ctx["radiation"], ctx["sim_event"])
 

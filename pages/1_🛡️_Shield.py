@@ -1,12 +1,44 @@
 import streamlit as st
+
 st.set_page_config(page_title="Solar OS", layout="wide", page_icon="☀️")
 
+from utils.ai_engine import ai_decision
 from utils.app_state import setup_app
 
 ctx = setup_app()
 
+sim_event = st.session_state.get("sim_event")
+if ctx.get("cv_threat") in ("bird", "dust"):
+    sim_event = ctx["cv_threat"]
+    st.session_state.sim_event = sim_event
+
+status, action, mode, solar_output, shield, shield_reason, threat_level = ai_decision(
+    ctx["wcode"],
+    ctx["wind"],
+    ctx["rain"],
+    ctx["radiation"],
+    sim_event,
+)
+ctx.update(
+    {
+        "sim_event": sim_event,
+        "status": status,
+        "action": action,
+        "mode": mode,
+        "solar_output": solar_output,
+        "shield": shield,
+        "shield_reason": shield_reason,
+        "threat_level": threat_level,
+    }
+)
+
 st.title("🛡️ Shield Protection")
 st.caption(f"Autonomous panel protection | 📍 {ctx['city_name']}")
+
+if sim_event == "bird":
+    st.warning("🐦 **Bird threat active** — shield on standby with partial closure.")
+elif sim_event == "dust":
+    st.warning("🌫️ **Dust storm active** — 25% panel efficiency loss. Auto-clean sequence running.")
 
 st.subheader("🛡️ Shield Protection System")
 s1, s2, s3 = st.columns(3)
@@ -14,7 +46,8 @@ with s1:
     if ctx["shield"] == "CLOSED":
         st.error(f"### 🔒 SHIELD: CLOSED\n**Reason:** {ctx['shield_reason']}\n\nPanels fully protected.")
     elif ctx["shield"] == "READY":
-        st.warning(f"### ⚠️ SHIELD: STANDBY\n**Reason:** {ctx['shield_reason']}\n\nShield ready to deploy.")
+        shield_label = "STANDBY / PARTIAL" if sim_event == "bird" else "STANDBY"
+        st.warning(f"### ⚠️ SHIELD: {shield_label}\n**Reason:** {ctx['shield_reason']}\n\nShield ready to deploy.")
     else:
         st.success(f"### ✅ SHIELD: OPEN\n**Reason:** {ctx['shield_reason']}\n\nMaximum harvesting active.")
 
@@ -41,8 +74,8 @@ with s3:
         "🌧️ Heavy Rain": "🔴 YES" if ctx["rain"] > 0.5 else "🟢 NO",
         "💨 Extreme Wind": "🔴 YES" if ctx["wind"] > 60 else "🟢 NO",
         "⚠️ High Wind": "🟡 WATCH" if 40 < ctx["wind"] <= 60 else "🟢 NO",
-        "🌫️ Dust Storm": "🔴 YES" if ctx["sim_event"] == "dust" else "🟢 NO",
-        "🐦 Bird Activity": "🔴 YES" if ctx["sim_event"] == "bird" else "🟢 NO",
+        "🌫️ Dust Storm": "🔴 YES" if sim_event == "dust" else "🟢 NO",
+        "🐦 Bird Activity": "🔴 YES" if sim_event == "bird" else "🟢 NO",
     }
     for label, value in threats.items():
         st.markdown(f"{label} — **{value}**")

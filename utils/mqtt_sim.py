@@ -18,11 +18,16 @@ def _energy_mode_label(ctx):
     return mapping.get(ctx["mode"], ctx["status"])
 
 
-def _alert_level(threat_level):
-    return "HIGH" if threat_level in ("CRITICAL", "HIGH") else "LOW"
+def _alert_level(threat_level, sim_event=None):
+    if threat_level in ("CRITICAL", "HIGH"):
+        return "HIGH"
+    if threat_level == "MEDIUM" or sim_event in ("bird", "dust"):
+        return "MEDIUM"
+    return "LOW"
 
 
 def _build_topic_payloads(ctx):
+    sim_event = ctx.get("sim_event")
     return [
         (
             "solar/weather",
@@ -34,13 +39,18 @@ def _build_topic_payloads(ctx):
         ),
         (
             "solar/energy_mode",
-            {"mode": _energy_mode_label(ctx)},
+            {
+                "mode": _energy_mode_label(ctx),
+                "battery": ctx.get("battery_level", st.session_state.get("battery_level")),
+                "h2_level": ctx.get("h2_level", st.session_state.get("h2_level")),
+            },
         ),
         (
             "solar/alerts",
             {
-                "level": _alert_level(ctx["threat_level"]),
+                "level": _alert_level(ctx["threat_level"], sim_event),
                 "message": ctx["action"],
+                "sim_event": sim_event,
             },
         ),
     ]

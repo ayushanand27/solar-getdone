@@ -115,19 +115,23 @@ def process_auto_alerts(ctx, config):
         init_alert_state()
         city = ctx.get("city_name", "Farm")
         sim = ctx.get("sim_event")
+        cv_threat = ctx.get("cv_threat")
+        effective_sim = sim
+        if cv_threat in ("bird", "dust"):
+            effective_sim = cv_threat
 
-        if sim != st.session_state.get("last_sim_event"):
+        if effective_sim != st.session_state.get("last_sim_event"):
             st.session_state.last_auto_alert_key = None
-            st.session_state.last_sim_event = sim
+            st.session_state.last_sim_event = effective_sim
 
-        if sim == "bird" and config.get("bird_dust"):
+        if effective_sim == "bird" and config.get("bird_dust"):
             _auto_once(
                 "bird",
                 "CV Detection",
                 f"Bird activity detected at {city}. Shield partially closed. Check dashboard.",
                 config["bird_dust"],
             )
-        elif sim == "dust" and config.get("bird_dust"):
+        elif effective_sim == "dust" and config.get("bird_dust"):
             _auto_once(
                 "dust",
                 "CV Detection",
@@ -143,7 +147,9 @@ def process_auto_alerts(ctx, config):
                 config["storm"],
             )
 
-        batt = battery_level(ctx.get("solar_output", 0))
+        batt = ctx.get("battery_level")
+        if batt is None:
+            batt = battery_level(ctx.get("solar_output", 0))
         if batt < 20 and config.get("battery"):
             _auto_once(
                 f"battery_{batt}",
@@ -152,7 +158,9 @@ def process_auto_alerts(ctx, config):
                 config["battery"],
             )
 
-        h2 = h2_tank_level(ctx.get("radiation", []))
+        h2 = ctx.get("h2_level")
+        if h2 is None:
+            h2 = h2_tank_level(ctx.get("radiation", []))
         if h2 > 80 and config.get("h2_full"):
             _auto_once(
                 f"h2_{h2}",
@@ -186,9 +194,12 @@ def latest_phone_message(ctx):
     preview = st.session_state.get("latest_alert_preview")
     if preview:
         return preview
-    if ctx["sim_event"] == "bird":
+    sim = ctx.get("sim_event")
+    if ctx.get("cv_threat") in ("bird", "dust"):
+        sim = ctx["cv_threat"]
+    if sim == "bird":
         return f"Bird activity detected at {ctx['city_name']}. Shield partially closed. Check dashboard."
-    if ctx["sim_event"] == "dust":
+    if sim == "dust":
         return f"Dust storm detected at {ctx['city_name']}. Auto-clean initiated."
     return f"All systems normal at {ctx['city_name']}. Solar output {ctx['solar_output']} W/m²."
 

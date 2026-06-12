@@ -101,8 +101,13 @@ def build_recommendations(ctx, metrics):
         recs.append("Rain expected — keep shields on standby and defer grid export.")
 
     hour = datetime.now().hour
-    if hour in {6, 7, 8, 9, 18, 19, 20, 21}:
-        recs.append("Peak pricing window 6-10am / 6-10pm — export surplus now.")
+    grid_period = ctx.get("grid_period")
+    grid_price = ctx.get("grid_price")
+    if grid_period == "Peak" or hour in {6, 7, 8, 9, 18, 19, 20, 21}:
+        price_label = f"₹{grid_price}/kWh" if grid_price else "₹12/kWh"
+        recs.append(f"Peak pricing window active ({price_label}) — export surplus now.")
+    elif grid_period and grid_price:
+        recs.append(f"Current grid tier: {grid_period} at ₹{grid_price}/kWh — optimize export timing.")
     elif ctx["solar_output"] > 50:
         recs.append("Moderate solar window — prioritize battery charge then H2 conversion.")
 

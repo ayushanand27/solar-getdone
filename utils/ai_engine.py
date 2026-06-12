@@ -3,7 +3,8 @@ from datetime import datetime
 
 def ai_decision(wcode, wind, rain, radiation, sim_event):
     hr = min(datetime.now().hour, len(radiation) - 1)
-    solar_output = round(radiation[hr] * 0.22, 1)
+    dust_factor = 0.75 if sim_event == "dust" else 1.0
+    solar_output = round(radiation[hr] * 0.22 * dust_factor, 1)
 
     if wcode >= 95:
         return (
@@ -35,16 +36,6 @@ def ai_decision(wcode, wind, rain, radiation, sim_event):
             "Extreme wind speed",
             "HIGH",
         )
-    if wind > 40:
-        return (
-            "⚠️ MONITORING",
-            "High wind — monitoring closely",
-            "monitor",
-            solar_output,
-            "READY",
-            "Wind speed elevated — shield on standby",
-            "MEDIUM",
-        )
     if sim_event == "bird":
         return (
             "🛡️ SHIELD PARTIAL",
@@ -58,11 +49,21 @@ def ai_decision(wcode, wind, rain, radiation, sim_event):
     if sim_event == "dust":
         return (
             "⚠️ DUST ALERT",
-            "Dust storm — auto-clean sequence triggered",
+            "Dust storm — auto-clean sequence triggered (25% efficiency loss)",
             "monitor",
             solar_output,
             "READY",
             "Dust levels critical",
+            "MEDIUM",
+        )
+    if wind > 40:
+        return (
+            "⚠️ MONITORING",
+            "High wind — monitoring closely",
+            "monitor",
+            solar_output,
+            "READY",
+            "Wind speed elevated — shield on standby",
             "MEDIUM",
         )
     if solar_output > 150:

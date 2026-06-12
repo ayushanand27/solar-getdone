@@ -8,6 +8,8 @@ from PIL import Image
 from utils.ai_engine import ai_decision
 from utils.auth import check_auth
 from utils.cv_module import SAMPLE_IMAGES, SAMPLES_DIR, run_cv_detection
+from utils.grid_pricing import current_grid_tier
+from utils.health_score import calculate_health_score
 from utils.weather import get_7day, get_coordinates, get_weather
 
 
@@ -188,9 +190,34 @@ def setup_app():
     radiation = [float(r or 0) for r in hourly["shortwave_radiation"]]
     hours = hourly["time"]
 
+    sim_event = st.session_state.get("sim_event")
     status, action, mode, solar_output, shield, shield_reason, threat_level = ai_decision(
-        wcode, wind, rain, radiation, sidebar["sim_event"]
+        wcode, wind, rain, radiation, sim_event
     )
+
+    h2_kg = round(sum(r * 0.22 * 0.7 for r in radiation if r > 100) / 1000, 2)
+    battery_level = min(100, int(solar_output / 2))
+    h2_level = min(100, int(h2_kg * 40))
+    health_score, health_grade = calculate_health_score(
+        solar_output,
+        threat_level,
+        battery_level,
+        h2_level,
+        shield,
+        wind,
+        rain,
+        wcode,
+    )
+    grid_tier = current_grid_tier()
+
+    st.session_state.battery_level = battery_level
+    st.session_state.h2_kg = h2_kg
+    st.session_state.h2_level = h2_level
+    st.session_state.shield_status = shield
+    st.session_state.health_score = health_score
+    st.session_state.health_grade = health_grade
+    st.session_state.grid_price = grid_tier["price"]
+    st.session_state.grid_period = grid_tier["period"]
 
     if sidebar["edge_mode"]:
         edge_log = st.session_state.edge_decision_log
@@ -221,6 +248,13 @@ def setup_app():
         "shield_reason": shield_reason,
         "threat_level": threat_level,
         "forecast": forecast,
+        "battery_level": battery_level,
+        "h2_kg": h2_kg,
+        "h2_level": h2_level,
+        "health_score": health_score,
+        "health_grade": health_grade,
+        "grid_price": grid_tier["price"],
+        "grid_period": grid_tier["period"],
     }
 
     if sidebar["auto_sim"]:

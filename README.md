@@ -183,8 +183,7 @@ Add screenshots to `docs/screenshots/` and reference them here:
 
 ## 👨‍💻 Built By
 
-**Ayush Anand** | CSE — IoT & Intelligent Systems  
-Manipal University Jaipur | 3rd Year  
+Ayush Anand
 GitHub: [github.com/ayushanand27](https://github.com/ayushanand27)
 
 ---

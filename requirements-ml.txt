@@ -1,0 +1,4 @@
+# Optional: install locally for YOLO upload detection
+# pip install -r requirements-ml.txt
+opencv-python-headless==4.10.0.84
+ultralytics>=8.0.0,<9.0.0

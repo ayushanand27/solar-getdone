@@ -7,7 +7,7 @@ from PIL import Image
 
 from utils.ai_engine import ai_decision, apply_sim_overrides
 from utils.auth import check_auth
-from utils.cv_module import SAMPLE_IMAGES, SAMPLES_DIR, run_cv_detection
+from utils.cv_config import SAMPLE_IMAGES, SAMPLES_DIR, run_cv_detection
 from utils.grid_pricing import current_grid_tier
 from utils.health_score import calculate_health_score
 from utils.weather import get_7day, get_coordinates, get_weather
@@ -95,7 +95,7 @@ def render_sidebar():
     cv_source = st.sidebar.radio(
         "Image Source",
         ["📁 Use Sample Image", "📤 Upload My Image"],
-        index=1,
+        index=0,
         key="cv_source",
     )
     cv_image = None

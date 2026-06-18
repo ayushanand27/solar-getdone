@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import cv2
 import numpy as np
 import streamlit as st
 from PIL import Image, ImageDraw
@@ -21,6 +20,14 @@ SAMPLES_DIR = Path("samples") if Path("samples").exists() else Path("sample")
 
 @st.cache_resource
 def load_yolo_model():
+    try:
+        import cv2  # noqa: F401 — required by ultralytics on upload path
+    except ImportError as exc:
+        raise RuntimeError(
+            "OpenCV (cv2) is not available. Sample images still work; "
+            "upload detection needs opencv-python-headless on the server."
+        ) from exc
+
     from ultralytics import YOLO
 
     return YOLO("yolov8n.pt")
@@ -71,8 +78,19 @@ def run_cv_detection(image, filename, is_sample):
         display_image = add_threat_border(image, threat)
         return threat, confidence, display_image, *get_cv_verdict(threat), []
 
-    model = load_yolo_model()
-    results = model(np.array(image), verbose=False)[0]
+    try:
+        model = load_yolo_model()
+        results = model(np.array(image), verbose=False)[0]
+    except Exception as exc:
+        return (
+            None,
+            None,
+            image,
+            "LOW",
+            f"Upload CV unavailable ({exc}). Use sample images for demo.",
+            [],
+        )
+
     detections = []
     if results.boxes is not None:
         for box in results.boxes:
@@ -85,7 +103,7 @@ def run_cv_detection(image, filename, is_sample):
             )
 
     annotated_bgr = results.plot()
-    annotated_rgb = cv2.cvtColor(annotated_bgr, cv2.COLOR_BGR2RGB)
+    annotated_rgb = annotated_bgr[:, :, ::-1]
     annotated = Image.fromarray(annotated_rgb)
 
     bird_hits = [d for d in detections if d["class"] == "bird"]

@@ -167,17 +167,44 @@ solar/
 
 ## 📸 Screenshots
 
-Add screenshots to `docs/screenshots/` and reference them here:
+### Home — Health Score & Live Status
+![Home](docs/screenshots/home.png)
 
-| Page | File |
-|---|---|
-| Home | `docs/screenshots/home.png` |
-| Shield + CV | `docs/screenshots/shield-cv.png` |
-| Multi-Farm Map | `docs/screenshots/multi-farm.png` |
-| Grid Export | `docs/screenshots/grid-export.png` |
-| Edge Node | `docs/screenshots/edge-node.png` |
-| AI Assistant | `docs/screenshots/ai-assistant.png` |
-| Architecture | `docs/screenshots/architecture.png` |
+### Shield — Protection + CV Threat Detection
+![Shield Open](docs/screenshots/shield-open.png)
+![Shield + Bird CV](docs/screenshots/shield-cv.png)
+
+### Energy — Radiation Chart, Battery & H₂
+![Energy](docs/screenshots/energy.png)
+
+### Multi-Farm — India Fleet Map
+![Multi-Farm](docs/screenshots/multi-farm.png)
+
+### Grid Export — Time-of-Day Optimization
+![Grid Export](docs/screenshots/grid-export.png)
+
+### Edge Node — RPi4 Simulation + MQTT + Alerts
+![Edge Node](docs/screenshots/edge-node.png)
+![Edge Alerts](docs/screenshots/edge-alerts.png)
+
+### AI Assistant — Groq Chat with Live Farm Context
+![AI Assistant](docs/screenshots/ai-assistant.png)
+
+### Architecture — System Data-Flow Map
+![Architecture](docs/screenshots/architecture.png)
+
+### Analytics — Savings Calculator + 25-Year ROI
+![Analytics](docs/screenshots/analytics.png)
+![Analytics ROI](docs/screenshots/analytics-roi.png)
+
+### Carbon Credits — ESG Dashboard
+![Carbon Credits](docs/screenshots/carbon-credits.png)
+
+### Maintenance — Predictive Health & Calendar
+![Maintenance](docs/screenshots/maintenance.png)
+
+### Compliance — CEA 2026 Checker
+![Compliance](docs/screenshots/compliance.png)
 
 ---
 
